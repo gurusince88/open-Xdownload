@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { Dialog, Popover, Tooltip as RadixTooltip } from "radix-ui";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/cn";
 import { Button } from "./Button";
 
@@ -25,6 +26,7 @@ export function Modal({
   className?: string;
   bodyClassName?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <Dialog.Root open={open} onOpenChange={(next) => !next && onClose()}>
       <Dialog.Portal>
@@ -48,7 +50,7 @@ export function Modal({
                 )}
               </div>
               <Dialog.Close asChild>
-                <Button variant="text" size="sm" circle icon={<X className="size-4" />} aria-label="关闭" />
+                <Button variant="text" size="sm" circle icon={<X className="size-4" />} aria-label={t("common.close")} />
               </Dialog.Close>
             </div>
           )}
@@ -80,6 +82,7 @@ export function MediaModal({
   children: React.ReactNode;
   className?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <Dialog.Root open={open} onOpenChange={(next) => !next && onClose()}>
       <Dialog.Portal>
@@ -96,7 +99,7 @@ export function MediaModal({
               {title}
             </Dialog.Title>
             <Dialog.Close asChild>
-              <Button variant="text" size="sm" circle icon={<X className="size-4" />} aria-label="关闭" />
+              <Button variant="text" size="sm" circle icon={<X className="size-4" />} aria-label={t("common.close")} />
             </Dialog.Close>
           </div>
           {children}
@@ -124,6 +127,7 @@ export function Drawer({
   children: React.ReactNode;
   className?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <Dialog.Root open={open} onOpenChange={(next) => !next && onClose()}>
       <Dialog.Portal>
@@ -144,11 +148,11 @@ export function Drawer({
             <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
               <Dialog.Title className="min-w-0 text-sm font-semibold text-fg">{title}</Dialog.Title>
               <Dialog.Close asChild>
-                <Button variant="text" size="sm" circle icon={<X className="size-4" />} aria-label="关闭" />
+                <Button variant="text" size="sm" circle icon={<X className="size-4" />} aria-label={t("common.close")} />
               </Dialog.Close>
             </div>
           ) : (
-            <Dialog.Title className="sr-only">导航菜单</Dialog.Title>
+            <Dialog.Title className="sr-only">{t("ui.navMenu")}</Dialog.Title>
           )}
           <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
         </Dialog.Content>
@@ -203,8 +207,8 @@ export function Tooltip({
 export function Popconfirm({
   title,
   description,
-  okText = "确定",
-  cancelText = "取消",
+  okText,
+  cancelText,
   danger = false,
   disabled = false,
   onConfirm,
@@ -219,6 +223,9 @@ export function Popconfirm({
   onConfirm: () => void;
   children: React.ReactNode;
 }) {
+  const { t } = useTranslation();
+  const resolvedOk = okText ?? t("ui.ok");
+  const resolvedCancel = cancelText ?? t("common.cancel");
   const [open, setOpen] = React.useState(false);
   // disabled 时直接透传子元素，不挂弹出行为
   if (disabled) return <>{children}</>;
@@ -239,7 +246,7 @@ export function Popconfirm({
           {description && <div className="mt-1 text-xs text-fg-muted">{description}</div>}
           <div className="mt-3 flex items-center justify-end gap-2">
             <Button size="sm" variant="text" onClick={() => setOpen(false)}>
-              {cancelText}
+              {resolvedCancel}
             </Button>
             <Button
               size="sm"
@@ -249,7 +256,7 @@ export function Popconfirm({
                 onConfirm();
               }}
             >
-              {okText}
+              {resolvedOk}
             </Button>
           </div>
           <Popover.Arrow className="fill-surface" />

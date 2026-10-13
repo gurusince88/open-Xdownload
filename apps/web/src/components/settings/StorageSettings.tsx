@@ -1,10 +1,11 @@
 import React from "react";
+import i18n from "../../i18n";
 import type { AppConfig } from "../../lib/api";
 import { Stack } from "../common/CommonUI";
 import { LocalDirectoryPicker } from "./LocalDirectoryPicker";
 
 export function storageTargetLabel(config: AppConfig) {
-  return config.downloadDir || "本地目录未配置";
+  return config.downloadDir || i18n.t("settings.localDirUnset");
 }
 
 export function StorageSettings({

@@ -1,5 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/cn";
 import { Empty } from "./Feedback";
 import { LoadingOverlay } from "./Spinner";
@@ -28,7 +29,7 @@ export function Table<T>({
   loading = false,
   minWidth,
   expandedRowRender,
-  emptyText = "暂无数据",
+  emptyText,
   footer,
   className,
 }: {
@@ -42,6 +43,8 @@ export function Table<T>({
   footer?: React.ReactNode;
   className?: string;
 }) {
+  const { t } = useTranslation();
+  const resolvedEmpty = emptyText ?? t("tasks.empty");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const baseId = React.useId();
 
@@ -86,7 +89,7 @@ export function Table<T>({
               {data.length === 0 ? (
                 <tr>
                   <td colSpan={columnCount}>
-                    <Empty description={emptyText} />
+                    <Empty description={resolvedEmpty} />
                   </td>
                 </tr>
               ) : (
@@ -103,7 +106,7 @@ export function Table<T>({
                               type="button"
                               aria-expanded={isOpen}
                               aria-controls={panelId}
-                              aria-label={isOpen ? "收起详情" : "展开详情"}
+                              aria-label={isOpen ? t("ui.collapseDetails") : t("ui.expandDetails")}
                               onClick={() => toggle(key)}
                               className={cn(
                                 "flex size-7 cursor-pointer items-center justify-center rounded-control",

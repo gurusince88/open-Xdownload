@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/cn";
 import { Select } from "./Controls";
 
@@ -43,6 +44,7 @@ export function Pagination({
   size?: "sm" | "md";
   className?: string;
 }) {
+  const { t } = useTranslation();
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const current = Math.min(Math.max(1, page), totalPages);
 
@@ -60,14 +62,16 @@ export function Pagination({
 
   return (
     <nav
-      aria-label="分页"
+      aria-label={t("ui.pagination")}
       className={cn("flex flex-wrap items-center justify-between gap-3", className)}
     >
-      <p className="text-xs text-fg-muted">{totalLabel?.(total) ?? `共 ${total} 条`}</p>
+      <p className="text-xs text-fg-muted">
+        {totalLabel?.(total) ?? t("common.totalItems", { count: total })}
+      </p>
       <div className="flex items-center gap-1.5">
         <button
           type="button"
-          aria-label="上一页"
+          aria-label={t("common.prevPage")}
           disabled={current <= 1}
           onClick={() => onPageChange(current - 1)}
           className={stepClass}
@@ -87,7 +91,7 @@ export function Pagination({
             <button
               key={item}
               type="button"
-              aria-label={`第 ${item} 页`}
+              aria-label={t("common.pageN", { page: item })}
               aria-current={item === current ? "page" : undefined}
               onClick={() => onPageChange(item)}
               className={cn(
@@ -105,7 +109,7 @@ export function Pagination({
         )}
         <button
           type="button"
-          aria-label="下一页"
+          aria-label={t("common.nextPage")}
           disabled={current >= totalPages}
           onClick={() => onPageChange(current + 1)}
           className={stepClass}
@@ -115,12 +119,12 @@ export function Pagination({
         {onPageSizeChange && (
           <Select
             size="sm"
-            ariaLabel="每页条数"
+            ariaLabel={t("ui.pageSize")}
             value={String(pageSize)}
             onChange={(next) => onPageSizeChange(Number(next))}
             options={PAGE_SIZE_OPTIONS.map((optSize) => ({
               value: String(optSize),
-              label: `${optSize} 条/页`,
+              label: t("ui.perPage", { count: optSize }),
             }))}
             className={cn("ml-1 w-[6.5rem]", !isSmall && "h-8 text-xs")}
           />

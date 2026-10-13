@@ -1,5 +1,6 @@
 import { AlertCircle, CheckCircle2, Info, Inbox, TriangleAlert } from "lucide-react";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/cn";
 import type { Tone } from "./Tag";
 
@@ -69,8 +70,9 @@ export function Skeleton({ className }: { className?: string }) {
 
 // 列表骨架：标题宽度交替，避免整列等宽显得呆板。
 export function ListSkeleton({ rows = 4, avatar = true }: { rows?: number; avatar?: boolean }) {
+  const { t } = useTranslation();
   return (
-    <div className="flex flex-col gap-3" role="status" aria-label="加载中">
+    <div className="flex flex-col gap-3" role="status" aria-label={t("common.loading")}>
       {Array.from({ length: rows }, (_, index) => (
         <div key={index} className="flex items-start gap-3">
           {avatar && <Skeleton className="size-9 shrink-0 rounded-full" />}

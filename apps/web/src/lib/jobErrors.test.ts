@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Job } from "./api";
+import i18n from "../i18n";
 import { getJobProgressDisplay, parseAggregatedErrors } from "./jobErrors";
+
+void i18n.changeLanguage("zh");
 
 describe("jobErrors", () => {
   describe("parseAggregatedErrors", () => {

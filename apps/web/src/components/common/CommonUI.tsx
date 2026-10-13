@@ -1,6 +1,8 @@
 import { Check, Copy } from "lucide-react";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { JobKind } from "../../lib/api";
+import i18n from "../../i18n";
 import { cn } from "../../lib/cn";
 import { Button } from "../ui/Button";
 import { Empty as UiEmpty, ListSkeleton as UiListSkeleton } from "../ui/Feedback";
@@ -28,14 +30,15 @@ export function ListSkeleton({ rows = 4, avatar = true }: { rows?: number; avata
 export function LoadingSurface({
   children,
   loading,
-  tip = "加载中",
+  tip,
 }: {
   children: React.ReactNode;
   loading?: boolean;
   tip?: string;
 }) {
+  const { t } = useTranslation();
   return (
-    <LoadingOverlay loading={!!loading} tip={tip}>
+    <LoadingOverlay loading={!!loading} tip={tip ?? t("common.loading")}>
       <div className="min-w-0">{children}</div>
     </LoadingOverlay>
   );
@@ -156,13 +159,16 @@ export function AppPagination({
   simple?: boolean;
   total: number;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex w-full justify-end">
       <UiPagination
         page={current}
         pageSize={pageSize}
         total={total}
-        totalLabel={(t) => (simple ? undefined : `共 ${t} ${itemName}`)}
+        totalLabel={(count) =>
+          simple ? undefined : t("common.itemsNamed", { count, name: itemName })
+        }
         onPageChange={(p) => onChange(p, pageSize)}
         onPageSizeChange={(ps) => onChange(1, ps)}
       />
@@ -272,23 +278,25 @@ export async function writeClipboard(text: string) {
   }
 }
 
-export async function copyToClipboard(text: string, label = "路径") {
+export async function copyToClipboard(text: string, label?: string) {
+  const resolvedLabel = label ?? i18n.t("common.path");
   const copied = await writeClipboard(text);
   if (copied) {
     toast.success({
-      message: "复制成功",
-      description: `已复制${label}到剪贴板`,
+      message: i18n.t("common.copySuccess"),
+      description: i18n.t("common.copiedDesc", { label: resolvedLabel }),
     });
   } else {
     toast.warning({
-      message: "复制失败",
-      description: `当前浏览器环境不支持自动复制，请手动复制${label}`,
+      message: i18n.t("common.copyFailed"),
+      description: i18n.t("common.clipboardUnsupported", { label: resolvedLabel }),
     });
   }
   return copied;
 }
 
 export function CopyButton({ value, label }: { value: string; label: string }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
@@ -299,13 +307,13 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
     }
     setCopied(false);
     toast.warning({
-      message: "复制失败",
-      description: `当前浏览器环境不支持自动复制，请手动复制${label}`,
+      message: t("common.copyFailed"),
+      description: t("common.clipboardUnsupported", { label }),
     });
   }
 
   return (
-    <Tooltip content={copied ? "已复制" : label}>
+    <Tooltip content={copied ? t("common.copied") : label}>
       <Button
         size="sm"
         variant={copied ? "primary" : "ghost"}
@@ -319,17 +327,17 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
 
 export function formatIntervalMinutes(minutes: number) {
   if (!Number.isFinite(minutes) || minutes <= 0) {
-    return "未设置";
+    return i18n.t("common.notSet");
   }
   if (minutes % 1440 === 0) {
     const days = minutes / 1440;
-    return `每 ${days} 天`;
+    return i18n.t("common.everyDays", { count: days });
   }
   if (minutes % 60 === 0) {
     const hours = minutes / 60;
-    return `每 ${hours} 小时`;
+    return i18n.t("common.everyHours", { count: hours });
   }
-  return `每 ${minutes} 分钟`;
+  return i18n.t("common.everyMinutes", { count: minutes });
 }
 
 // 表格每一行、媒体库每张卡片都会调用，formatter 提到模块级只构造一次。
@@ -357,24 +365,14 @@ export function clampPercent(value: number) {
 }
 
 export function kindLabel(kind: JobKind) {
-  const labels: Record<string, string> = {
-    tweet_link: "推文链接",
-    media_url: "媒体地址",
-    user: "用户",
-    list: "列表",
-    following: "关注",
-    failed_retry: "失败重试",
-  };
-  return labels[kind] ?? "未知类型";
+  const key = `jobKind.${kind}` as const;
+  const translated = i18n.t(key);
+  if (translated !== key) return translated;
+  return i18n.t("jobKind.unknown");
 }
 
 export function mediaTypeLabel(type: "photo" | "video" | "animated_gif" | "file") {
-  return {
-    photo: "图片",
-    video: "视频",
-    animated_gif: "GIF",
-    file: "文件",
-  }[type];
+  return i18n.t(`mediaType.${type}`);
 }
 
 export function getErrorMessage(error: unknown) {
@@ -384,7 +382,7 @@ export function getErrorMessage(error: unknown) {
   if (typeof error === "string") {
     return error;
   }
-  return "未知错误";
+  return i18n.t("common.unknownError");
 }
 
 export function notifyError(title: string) {

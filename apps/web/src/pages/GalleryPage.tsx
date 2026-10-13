@@ -81,6 +81,7 @@ function VideoPoster({
   fileName: string;
   onOpen: () => void;
 }) {
+  const { t } = useTranslation();
   const sources = useMemo(() => {
     const list: { url: string; remote: boolean }[] = [];
     if (item.id > 0) {
@@ -98,11 +99,11 @@ function VideoPoster({
       type="button"
       className="group relative h-full w-full cursor-pointer border-0 bg-slate-950 p-0 overflow-hidden"
       onClick={onOpen}
-      aria-label={`预览视频 ${fileName}`}
+      aria-label={t("gallery.previewVideo", { name: fileName })}
     >
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-slate-400">
         <Video className="size-8 text-brand-400" />
-        <span className="text-xs">播放视频</span>
+        <span className="text-xs">{t("gallery.playVideo")}</span>
       </div>
       {sourceIndex < sources.length && (
         <img
@@ -135,6 +136,7 @@ const GalleryCard = React.memo(function GalleryCard({
   isPreviewableImage: boolean;
   onOpen: (previewId: string) => void;
 }) {
+  const { t } = useTranslation();
   const fileName = displayFileName(item);
   const ext = fileName.split(".").pop()?.toUpperCase() || "FILE";
   const previewURL = fileURL(item);
@@ -154,7 +156,7 @@ const GalleryCard = React.memo(function GalleryCard({
               type="button"
               className="group/img relative block h-full w-full cursor-pointer border-0 bg-transparent p-0 overflow-hidden"
               onClick={() => onOpen(entryKey(item))}
-              aria-label={`查看图片 ${fileName}`}
+              aria-label={t("gallery.viewImage", { name: fileName })}
             >
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-fg-subtle">
                 <ImageIcon className="size-8" />
@@ -174,7 +176,7 @@ const GalleryCard = React.memo(function GalleryCard({
           ) : (
             <div className="flex flex-col items-center gap-1 text-fg-subtle">
               <Film className="size-8" />
-              <span className="text-xs font-mono font-medium">{ext} 文件</span>
+              <span className="text-xs font-mono font-medium">{t("gallery.fileSuffix", { ext })}</span>
             </div>
           )}
 
@@ -190,7 +192,7 @@ const GalleryCard = React.memo(function GalleryCard({
         </div>
 
         <div className="truncate font-mono text-[11px] text-fg-muted flex items-center gap-1">
-          <span className="truncate">{item.userName || "未识别用户"}</span>
+          <span className="truncate">{item.userName || t("gallery.unknownUser")}</span>
           {item.userScreenName && (
             <span className="text-brand-500 font-medium shrink-0">@{item.userScreenName}</span>
           )}
@@ -199,24 +201,24 @@ const GalleryCard = React.memo(function GalleryCard({
         <div className="flex items-center justify-between pt-2 border-t border-line/70 text-[11px] text-fg-subtle">
           <span className="font-mono tabular-nums text-[10px]">{formatDateTime(item.createdAt)}</span>
           <div className="flex items-center gap-1">
-            <Tooltip title="复制本地路径">
+            <Tooltip title={t("tasks.copyLocalPath")}>
               <Button
                 size="sm"
                 variant="text"
                 circle
                 icon={<Copy className="size-3" />}
-                onClick={() => void copyToClipboard(item.filePath, "本地路径")}
-                aria-label="复制本地路径"
+                onClick={() => void copyToClipboard(item.filePath, t("tasks.localPath"))}
+                aria-label={t("tasks.copyLocalPath")}
               />
             </Tooltip>
-            <Tooltip title="复制媒体直链">
+            <Tooltip title={t("gallery.copyDirectLink")}>
               <Button
                 size="sm"
                 variant="text"
                 circle
                 icon={<ExternalLink className="size-3" />}
-                onClick={() => void copyToClipboard(item.mediaUrl, "原始下载直链")}
-                aria-label="复制下载直链"
+                onClick={() => void copyToClipboard(item.mediaUrl, t("tasks.rawLink"))}
+                aria-label={t("gallery.copyDownloadLink")}
               />
             </Tooltip>
           </div>
@@ -288,7 +290,7 @@ export function GalleryPage({ downloads }: GalleryPageProps) {
       const key = item.userScreenName || "unknown";
       const label = item.userScreenName
         ? `${item.userName || item.userScreenName} (@${item.userScreenName})`
-        : "未识别用户";
+        : t("gallery.unknownUser");
       users.set(key, label);
     }
     return [...users.entries()]
@@ -372,7 +374,7 @@ export function GalleryPage({ downloads }: GalleryPageProps) {
         <div>
           <h1 className="text-xl font-bold tracking-tight text-fg">{t("gallery.title")}</h1>
           <p className="mt-0.5 text-xs text-fg-muted">
-            集中浏览所有已下载的高清图片、动态 GIF 与 4K 视频原片
+            {t("gallery.subtitleLong")}
           </p>
         </div>
 
@@ -382,10 +384,10 @@ export function GalleryPage({ downloads }: GalleryPageProps) {
             value={filterType}
             onChange={(val) => setFilterType(val)}
             options={[
-              { label: `全部 (${categoryCounts.all})`, value: "all" },
-              { label: `图片 (${categoryCounts.images})`, value: "images" },
-              { label: `视频 (${categoryCounts.videos})`, value: "videos" },
-              { label: `动图 (${categoryCounts.gifs})`, value: "gifs" },
+              { label: t("gallery.all", { count: categoryCounts.all }), value: "all" },
+              { label: t("gallery.images", { count: categoryCounts.images }), value: "images" },
+              { label: t("gallery.videos", { count: categoryCounts.videos }), value: "videos" },
+              { label: t("gallery.gifs", { count: categoryCounts.gifs }), value: "gifs" },
             ]}
           />
 
@@ -394,12 +396,12 @@ export function GalleryPage({ downloads }: GalleryPageProps) {
               value={userFilter}
               onChange={setUserFilter}
               options={[{ value: "all", label: t("gallery.allUsers") }, ...userOptions]}
-              placeholder="按用户筛选..."
+              placeholder={t("gallery.filterUser")}
             />
           </div>
 
           <SearchInput
-            placeholder="搜索文件名、推文 ID..."
+            placeholder={t("gallery.searchShort")}
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
             allowClear
@@ -422,7 +424,7 @@ export function GalleryPage({ downloads }: GalleryPageProps) {
         </div>
       ) : filteredEntries.length === 0 ? (
         <Card className="text-center py-12">
-          <Empty description="暂无归档文件记录。完成下载任务后，媒体文件将自动在此呈现。" />
+          <Empty description={t("gallery.emptyLong")} />
         </Card>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
@@ -445,7 +447,7 @@ export function GalleryPage({ downloads }: GalleryPageProps) {
             page={currentPage}
             pageSize={pageSize}
             total={filteredEntries.length}
-            totalLabel={(total) => `共 ${total} 项`}
+            totalLabel={(total) => t("gallery.totalItems", { count: total })}
             onPageChange={(page) => setCurrentPage(page)}
           />
         </div>
@@ -457,7 +459,7 @@ export function GalleryPage({ downloads }: GalleryPageProps) {
         onClose={() => setPreviewId(null)}
         title={
           previewEntry
-            ? `${previewEntry.item.userName || "未识别用户"}${
+            ? `${previewEntry.item.userName || t("gallery.unknownUser")}${
                 previewEntry.item.userScreenName ? `  @${previewEntry.item.userScreenName}` : ""
               }`
             : ""
@@ -491,7 +493,7 @@ export function GalleryPage({ downloads }: GalleryPageProps) {
                 {/* 左右切图浮动按钮 */}
                 <button
                   type="button"
-                  aria-label="上一个媒体文件"
+                  aria-label={t("gallery.prevMedia")}
                   onClick={() => stepPreview(-1)}
                   className="absolute left-3 top-1/2 -translate-y-1/2 flex size-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/90 transition-colors cursor-pointer"
                 >
@@ -499,7 +501,7 @@ export function GalleryPage({ downloads }: GalleryPageProps) {
                 </button>
                 <button
                   type="button"
-                  aria-label="下一个媒体文件"
+                  aria-label={t("gallery.nextMedia")}
                   onClick={() => stepPreview(1)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 flex size-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/90 transition-colors cursor-pointer"
                 >
@@ -523,17 +525,17 @@ export function GalleryPage({ downloads }: GalleryPageProps) {
                     size="sm"
                     variant="default"
                     icon={<Copy className="size-3.5" />}
-                    onClick={() => void copyToClipboard(item.filePath, "本地路径")}
+                    onClick={() => void copyToClipboard(item.filePath, t("tasks.localPath"))}
                   >
-                    复制本地路径
+                    {t("tasks.copyLocalPath")}
                   </Button>
                   <Button
                     size="sm"
                     variant="default"
                     icon={<ExternalLink className="size-3.5" />}
-                    onClick={() => void copyToClipboard(item.mediaUrl, "原始下载直链")}
+                    onClick={() => void copyToClipboard(item.mediaUrl, t("tasks.rawLink"))}
                   >
-                    复制直链
+                    {t("gallery.copyDirectLinkShort")}
                   </Button>
                 </div>
               </div>

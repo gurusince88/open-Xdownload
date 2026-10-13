@@ -1,5 +1,6 @@
 import { Eye, EyeOff, Search, X } from "lucide-react";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/cn";
 
 // antd 的 Input 把 prefix/suffix/清除按钮画在边框内部，焦点环落在外层包裹上。
@@ -57,6 +58,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Inp
   },
   ref,
 ) {
+  const { t } = useTranslation();
   const innerRef = React.useRef<HTMLInputElement>(null);
   const showClear = allowClear && !rest.disabled && typeof value === "string" && value.length > 0;
 
@@ -80,7 +82,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Inp
       {showClear && (
         <button
           type="button"
-          aria-label="清空"
+          aria-label={t("common.clear")}
           onClick={() => {
             if (onClear) onClear();
             else clearControlledInput(innerRef.current);
@@ -109,6 +111,7 @@ export const PasswordInput = React.forwardRef<HTMLInputElement, InputProps>(func
   { suffix, ...rest },
   ref,
 ) {
+  const { t } = useTranslation();
   const [revealed, setRevealed] = useState(false);
   return (
     <Input
@@ -119,7 +122,7 @@ export const PasswordInput = React.forwardRef<HTMLInputElement, InputProps>(func
           {suffix}
           <button
             type="button"
-            aria-label={revealed ? "隐藏内容" : "显示内容"}
+            aria-label={revealed ? t("ui.hideContent") : t("ui.showContent")}
             aria-pressed={revealed}
             onClick={() => setRevealed((current) => !current)}
             className="flex cursor-pointer items-center rounded p-0.5 text-fg-subtle transition-colors hover:text-fg-body"

@@ -1,5 +1,6 @@
 import { AlertCircle, RotateCcw, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import React, { useState } from "react";
 import {
   clearFailedTweets,
@@ -35,6 +36,7 @@ export function FailedTweetQueue({
   items: FailedTweet[];
   total: number;
 }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -65,11 +67,11 @@ export function FailedTweetQueue({
     onSuccess: (job) => {
       refreshFailedTweets();
       toast.success({
-        message: "失败推文已加入重试",
-        description: job.title || "已创建重试任务",
+        message: t("failed.retryQueued"),
+        description: job.title || t("failed.retryCreated"),
       });
     },
-    onError: notifyError("重试失败"),
+    onError: notifyError(t("failed.retryFailed")),
   });
 
   const removeOne = useMutation({
@@ -79,9 +81,9 @@ export function FailedTweetQueue({
         setPage(page - 1);
       }
       refreshFailedTweets();
-      toast.success({ message: "失败记录已删除" });
+      toast.success({ message: t("failed.recordDeleted") });
     },
-    onError: notifyError("删除失败"),
+    onError: notifyError(t("failed.deleteFailed")),
   });
 
   const clearAll = useMutation({
@@ -89,16 +91,16 @@ export function FailedTweetQueue({
     onSuccess: () => {
       setPage(1);
       refreshFailedTweets();
-      toast.success({ message: "失败队列已清空" });
+      toast.success({ message: t("failed.queueCleared") });
     },
-    onError: notifyError("清空失败"),
+    onError: notifyError(t("failed.clearFailed")),
   });
 
   return (
     <Stack size={12}>
       <Toolbar>
         <span className="text-xs text-fg-muted">
-          {pagination.total > 0 ? `共 ${pagination.total} 条失败记录` : "暂无失败记录"}
+          {pagination.total > 0 ? t("failed.totalRecords", { count: pagination.total }) : t("failed.noRecords")}
         </span>
         <div className="flex items-center gap-2">
           <Button
@@ -109,13 +111,13 @@ export function FailedTweetQueue({
             disabled={pagination.total === 0}
             onClick={() => retryAll.mutate()}
           >
-            全部重试
+            {t("failed.retryAll")}
           </Button>
           <Popconfirm
-            title="清空失败队列"
-            description="确认删除全部失败推文记录？"
-            okText="清空"
-            cancelText="取消"
+            title={t("failed.clearTitle")}
+            description={t("failed.clearConfirm")}
+            okText={t("common.clear")}
+            cancelText={t("common.cancel")}
             disabled={pagination.total === 0}
             onConfirm={() => clearAll.mutate()}
           >
@@ -126,7 +128,7 @@ export function FailedTweetQueue({
               loading={clearAll.isPending}
               disabled={pagination.total === 0}
             >
-              清空
+              {t("common.clear")}
             </Button>
           </Popconfirm>
         </div>
@@ -135,7 +137,7 @@ export function FailedTweetQueue({
       {failedTweetsQuery.isLoading && pageItems.length === 0 ? (
         <ListSkeleton rows={pageSize} />
       ) : pageItems.length === 0 ? (
-        <AppEmpty description="暂无失败推文" />
+        <AppEmpty description={t("failed.empty")} />
       ) : (
         <LoadingSurface loading={failedTweetsQuery.isFetching}>
           <div className="divide-y divide-line rounded-card border border-line bg-surface">
@@ -151,14 +153,14 @@ export function FailedTweetQueue({
                         {item.jobTitle || item.tweetId}
                       </span>
                       <Tag tone="neutral" className="font-mono">
-                        {item.userScreenName ? `@${item.userScreenName}` : item.userId || "未知用户"}
+                        {item.userScreenName ? `@${item.userScreenName}` : item.userId || t("common.unknownUser")}
                       </Tag>
                     </div>
                     <EllipsisText type="danger" title={item.error} className="text-xs">
-                      {item.error || "未知错误"}
+                      {item.error || t("common.unknownError")}
                     </EllipsisText>
                     <div className="flex flex-wrap items-center gap-3 text-xs text-fg-subtle">
-                      <span className="font-mono">推文 {item.tweetId}</span>
+                      <span className="font-mono">{t("failed.tweetLabel", { id: item.tweetId })}</span>
                       <span>{formatDateTime(item.updatedAt || item.createdAt)}</span>
                       {item.entityName && <span>{item.entityName}</span>}
                     </div>
@@ -166,12 +168,12 @@ export function FailedTweetQueue({
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1.5">
-                  <CopyButton value={item.tweetId} label="复制推文 ID" />
+                  <CopyButton value={item.tweetId} label={t("failed.copyTweetId")} />
                   <Popconfirm
-                    title="删除失败记录"
-                    description="确认删除这条失败记录？"
-                    okText="删除"
-                    cancelText="取消"
+                    title={t("failed.deleteTitle")}
+                    description={t("failed.deleteConfirm")}
+                    okText={t("common.delete")}
+                    cancelText={t("common.cancel")}
                     onConfirm={() => removeOne.mutate(item.id)}
                   >
                     <Button
@@ -179,7 +181,7 @@ export function FailedTweetQueue({
                       variant="ghost"
                       icon={<Trash2 className="size-3.5 text-danger" />}
                       loading={removeOne.isPending && removeOne.variables === item.id}
-                      aria-label="删除此条记录"
+                      aria-label={t("failed.deleteAria")}
                     />
                   </Popconfirm>
                 </div>
@@ -191,7 +193,7 @@ export function FailedTweetQueue({
 
       <AppPagination
         current={pagination.page}
-        itemName="条记录"
+        itemName={t("failed.itemName")}
         pageSize={pagination.pageSize}
         pageSizeOptions={failedTweetPageSizeOptions}
         total={pagination.total}

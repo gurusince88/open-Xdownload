@@ -1,6 +1,7 @@
 import { Check, ChevronDown, Search } from "lucide-react";
 import { Popover } from "radix-ui";
 import React, { useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/cn";
 import type { SelectOption } from "./Controls";
 
@@ -11,8 +12,8 @@ export function SearchSelect({
   value,
   onChange,
   options,
-  placeholder = "请选择",
-  searchPlaceholder = "搜索...",
+  placeholder,
+  searchPlaceholder,
   size = "md",
   className,
   ariaLabel,
@@ -26,6 +27,9 @@ export function SearchSelect({
   className?: string;
   ariaLabel?: string;
 }) {
+  const { t } = useTranslation();
+  const resolvedPlaceholder = placeholder ?? t("ui.selectPlaceholder");
+  const resolvedSearchPlaceholder = searchPlaceholder ?? t("ui.searchPlaceholder");
   const [open, setOpen] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -85,7 +89,7 @@ export function SearchSelect({
         )}
       >
         <span className={cn("min-w-0 truncate", !selectedLabel && "text-fg-subtle")}>
-          {selectedLabel ?? placeholder}
+          {selectedLabel ?? resolvedPlaceholder}
         </span>
         <ChevronDown className="size-3.5 shrink-0 text-fg-subtle" />
       </Popover.Trigger>
@@ -123,7 +127,7 @@ export function SearchSelect({
                   commit(activeIndex);
                 }
               }}
-              placeholder={searchPlaceholder}
+              placeholder={resolvedSearchPlaceholder}
               aria-controls={listId}
               aria-activedescendant={
                 filtered[activeIndex] ? `${listId}-${activeIndex}` : undefined
@@ -133,7 +137,7 @@ export function SearchSelect({
           </div>
           <div ref={listRef} id={listId} role="listbox" className="max-h-64 overflow-y-auto p-1">
             {filtered.length === 0 ? (
-              <p className="px-2 py-3 text-center text-xs text-fg-muted">无匹配项</p>
+              <p className="px-2 py-3 text-center text-xs text-fg-muted">{t("ui.noMatches")}</p>
             ) : (
               filtered.map((option, index) => (
                 <div

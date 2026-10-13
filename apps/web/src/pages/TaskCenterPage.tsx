@@ -75,23 +75,6 @@ export interface TaskCenterPageProps {
   onOpenFailedDrawer: () => void;
 }
 
-const jobStatusPresentation: Record<
-  Job["status"],
-  { label: string; tone: Tone; icon?: React.ReactNode }
-> = {
-  pending: { label: "排队中", tone: "default", icon: <Clock className="size-3" /> },
-  resolving: { label: "解析中", tone: "brand", icon: <RefreshCw className="size-3 animate-spin" /> },
-  downloading: { label: "下载中", tone: "brand", icon: <RefreshCw className="size-3 animate-spin" /> },
-  completed: { label: "已完成", tone: "success", icon: <CheckCircle2 className="size-3" /> },
-  completed_with_errors: {
-    label: "部分失败",
-    tone: "warning",
-    icon: <AlertTriangle className="size-3" />,
-  },
-  failed: { label: "失败", tone: "danger", icon: <XCircle className="size-3" /> },
-  canceled: { label: "已取消", tone: "default" },
-};
-
 export function TaskCenterPage({
   jobs,
   stats,
@@ -108,6 +91,35 @@ export function TaskCenterPage({
   const [statusFilter, setStatusFilter] = useState<StatusFilterType>("all");
   const [kindFilter, setKindFilter] = useState<string>("all");
   const [searchKeyword, setSearchKeyword] = useState<string>("");
+
+  const jobStatusPresentation = useMemo(
+    (): Record<Job["status"], { label: string; tone: Tone; icon?: React.ReactNode }> => ({
+      pending: { label: t("tasks.statusPending"), tone: "default", icon: <Clock className="size-3" /> },
+      resolving: {
+        label: t("tasks.statusResolving"),
+        tone: "brand",
+        icon: <RefreshCw className="size-3 animate-spin" />,
+      },
+      downloading: {
+        label: t("tasks.statusDownloading"),
+        tone: "brand",
+        icon: <RefreshCw className="size-3 animate-spin" />,
+      },
+      completed: {
+        label: t("tasks.statusCompleted"),
+        tone: "success",
+        icon: <CheckCircle2 className="size-3" />,
+      },
+      completed_with_errors: {
+        label: t("tasks.statusPartial"),
+        tone: "warning",
+        icon: <AlertTriangle className="size-3" />,
+      },
+      failed: { label: t("tasks.statusFailedShort"), tone: "danger", icon: <XCircle className="size-3" /> },
+      canceled: { label: t("tasks.statusCanceledShort"), tone: "default" },
+    }),
+    [t],
+  );
 
   const isJobFailed = (job: Job) =>
     job.status === "failed" ||
@@ -127,9 +139,9 @@ export function TaskCenterPage({
     mutationFn: retryJob,
     onSuccess: (job) => {
       void invalidateWorkbenchQueries(queryClient);
-      toast.success({ message: `已创建重试任务 #${job.id}` });
+      toast.success({ message: t("tasks.retryCreatedId", { id: job.id }) });
     },
-    onError: notifyError("重试失败"),
+    onError: notifyError(t("failed.retryFailed")),
   });
 
   const retryAllFailed = useMutation({
@@ -137,11 +149,11 @@ export function TaskCenterPage({
     onSuccess: (newJob) => {
       void invalidateWorkbenchQueries(queryClient);
       toast.success({
-        message: "已创建重试任务",
-        description: newJob.title || "失败推文已重新加入执行队列",
+        message: t("failed.retryCreated"),
+        description: newJob.title || t("tasks.retryQueued"),
       });
     },
-    onError: notifyError("重试失败"),
+    onError: notifyError(t("failed.retryFailed")),
   });
 
   const filteredJobs = useMemo(() => {
@@ -199,7 +211,7 @@ export function TaskCenterPage({
   const columns: TableColumn<Job>[] = [
     {
       key: "title",
-      title: "任务目标 / 描述",
+      title: t("tasks.colTarget"),
       width: 280,
       render: (record) => (
         <div className="flex items-center gap-2.5 py-0.5">
@@ -211,7 +223,7 @@ export function TaskCenterPage({
               {record.title || kindLabel(record.kind)}
             </div>
             <div className="truncate font-mono text-xs text-fg-muted">
-              目标: {record.input} · #JOB-{record.id}
+              {t("tasks.targetLine", { input: record.input, id: record.id })}
             </div>
           </div>
         </div>
@@ -219,7 +231,7 @@ export function TaskCenterPage({
     },
     {
       key: "kind",
-      title: "类型",
+      title: t("tasks.colKind"),
       width: 100,
       render: (record) => (
         <Tag tone="default">
@@ -229,7 +241,7 @@ export function TaskCenterPage({
     },
     {
       key: "status",
-      title: "当前状态",
+      title: t("tasks.colStatus"),
       width: 120,
       render: (record) => {
         const meta = jobStatusPresentation[record.status];
@@ -288,7 +300,7 @@ export function TaskCenterPage({
     },
     {
       key: "updatedAt",
-      title: "更新时间",
+      title: t("tasks.colUpdated"),
       width: 140,
       render: (record) => (
         <span className="font-mono text-xs text-fg-subtle">
@@ -298,7 +310,7 @@ export function TaskCenterPage({
     },
     {
       key: "action",
-      title: "操作",
+      title: t("tasks.colActions"),
       width: 130,
       align: "right",
       render: (record) => {
@@ -316,7 +328,7 @@ export function TaskCenterPage({
                 loading={isCanceling}
                 onClick={() => cancel.mutate(record.id)}
               >
-                取消
+                {t("common.cancel")}
               </Button>
             )}
             {canRetry && (
@@ -326,7 +338,7 @@ export function TaskCenterPage({
                 loading={isRetrying}
                 onClick={() => retry.mutate(record.id)}
               >
-                重试
+                {t("common.retry")}
               </Button>
             )}
           </div>
@@ -436,7 +448,7 @@ export function TaskCenterPage({
       <Card size="sm" bodyClassName="p-3">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between flex-wrap">
           {/* 状态分类 Segmented */}
-          <Tooltip title="括号内为当前页的任务计数，全局统计见侧边栏与上方卡片">
+          <Tooltip title={t("tasks.filterHint")}>
             <div>
               <Segmented
                 size="md"
@@ -484,11 +496,11 @@ export function TaskCenterPage({
               className="w-36"
               options={[
                 { value: "all", label: t("tasks.allKinds") },
-                { value: "tweet_link", label: "单条推文" },
-                { value: "user", label: "用户媒体" },
-                { value: "list", label: "列表媒体" },
-                { value: "following", label: "关注媒体" },
-                { value: "failed_retry", label: "重试任务" },
+                { value: "tweet_link", label: t("tasks.kindTweet") },
+                { value: "user", label: t("tasks.kindMediaUser") },
+                { value: "list", label: t("tasks.kindMediaList") },
+                { value: "following", label: t("tasks.kindMediaFollowing") },
+                { value: "failed_retry", label: t("tasks.kindRetry") },
               ]}
             />
 
@@ -526,8 +538,8 @@ export function TaskCenterPage({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs text-fg-muted">
                 {hasActiveFilter
-                  ? `本页匹配 ${filteredJobs.length} 条（筛选仅作用于当前第 ${pagination.page} 页）`
-                  : `共 ${pagination.total} 个下载任务`}
+                  ? t("tasks.pageMatch", { count: filteredJobs.length, page: pagination.page })
+                  : t("tasks.totalJobs", { count: pagination.total })}
               </span>
               <Pagination
                 page={hasActiveFilter ? 1 : pagination.page}
@@ -564,18 +576,18 @@ function JobErrorAlert({ job }: { job: Job }) {
 
   const handleCopy = async () => {
     const textToCopy = [
-      `任务 ID: #${job.id}`,
-      `任务状态: ${job.status}`,
-      job.message ? `状态描述: ${job.message}` : "",
-      job.error ? `错误详情:\n${job.error}` : "",
+      t("tasks.diagId", { id: job.id }),
+      t("tasks.diagStatus", { status: job.status }),
+      job.message ? t("tasks.diagMessage", { message: job.message }) : "",
+      job.error ? t("tasks.diagError", { error: job.error }) : "",
     ]
       .filter(Boolean)
       .join("\n");
 
     if (!(await writeClipboard(textToCopy))) {
       toast.warning({
-        message: "复制失败",
-        description: "当前浏览器环境不支持自动复制，请手动复制错误信息",
+        message: t("common.copyFailed"),
+        description: t("common.clipboardUnsupported", { label: t("tasks.copyDiag") }),
       });
       return;
     }
@@ -612,7 +624,7 @@ function JobErrorAlert({ job }: { job: Job }) {
         <div className="mt-2 space-y-2.5">
           {groups.length === 0 ? (
             <div className="font-mono text-xs text-danger font-medium break-all">
-              {job.error || job.message || "未知异常，任务未能成功完成"}
+              {job.error || job.message || t("tasks.unknownAnomaly")}
             </div>
           ) : (
             <div className="space-y-2">
@@ -642,7 +654,7 @@ function JobErrorAlert({ job }: { job: Job }) {
                           </Tag>
                         )}
                         <Tag size="sm" tone="danger" className="font-medium">
-                          {group.count} 个失败
+                          {t("tasks.failedCount", { count: group.count })}
                         </Tag>
                       </div>
                     </div>
@@ -650,14 +662,14 @@ function JobErrorAlert({ job }: { job: Job }) {
                     {group.targets.length > 0 && (
                       <div className="space-y-1.5 pt-1.5 border-t border-line/50">
                         <div className="flex items-center justify-between text-[11px] text-fg-muted">
-                          <span>受影响账号 ({group.targets.length}):</span>
+                          <span>{t("tasks.affectedAccounts", { count: group.targets.length })}</span>
                           {hasMoreTargets && (
                             <button
                               type="button"
                               onClick={() => toggleExpand(group.id)}
                               className="text-[11px] text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
                             >
-                              {isExpanded ? "收起" : `展开更多 (+${group.targets.length - 8})`}
+                              {isExpanded ? t("common.collapse") : t("common.expandMore", { count: group.targets.length - 8 })}
                             </button>
                           )}
                         </div>
@@ -674,7 +686,7 @@ function JobErrorAlert({ job }: { job: Job }) {
                           ))}
                           {hiddenCount > 0 && (
                             <Tag size="sm" tone="warning" className="font-mono">
-                              另有 {hiddenCount} 个账号（相同原因已聚合）
+                              {t("tasks.moreAccounts", { count: hiddenCount })}
                             </Tag>
                           )}
                         </div>
@@ -688,7 +700,7 @@ function JobErrorAlert({ job }: { job: Job }) {
 
           {job.message && (
             <div className="pt-1 text-xs text-fg-muted flex items-center gap-1.5 border-t border-danger/15">
-              <span className="font-medium text-fg-subtle">状态概况:</span>
+              <span className="font-medium text-fg-subtle">{t("common.statusOverview")}:</span>
               <span>{job.message}</span>
             </div>
           )}
@@ -735,7 +747,7 @@ function ExpandedJobDetails({
     <PaginatedList<DownloadRecord>
       items={downloads}
       pageSize={6}
-      itemName="个文件"
+      itemName={t("tasks.itemFiles")}
       emptyDescription={t("tasks.noDownloads")}
       renderItem={(item) => {
         const fileName = item.filePath.split("/").pop() || item.filePath;
@@ -776,7 +788,7 @@ function ExpandedJobDetails({
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              <Tooltip title="复制文件完整本地路径">
+              <Tooltip title={t("tasks.copyFullPath")}>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -797,7 +809,7 @@ function ExpandedJobDetails({
     <PaginatedList<FailedMedia>
       items={failed}
       pageSize={6}
-      itemName="条失败记录"
+      itemName={t("tasks.itemFailedRecords")}
       emptyDescription={t("failed.empty")}
       renderItem={(item) => (
         <div className="flex items-center justify-between gap-3 text-xs">
@@ -850,30 +862,30 @@ function ExpandedJobDetails({
           items={[
             {
               key: "id",
-              label: "任务 ID",
+              label: t("tasks.jobId"),
               children: <span className="font-mono">#{job.id}</span>,
             },
             {
               key: "created",
-              label: "创建时间",
+              label: t("tasks.createdAt"),
               children: <span className="font-mono">{formatDateTime(job.createdAt)}</span>,
             },
             {
               key: "mediaCount",
-              label: "入库文件",
+              label: t("tasks.storedFiles"),
               children: (
                 <div className="flex items-center gap-2">
                   <Tag tone="success">
-                    成功 {downloads.length}
+                    {t("tasks.successCount", { count: downloads.length })}
                   </Tag>
                   {failed.length > 0 && (
                     <Tag tone="danger">
-                      失败 {failed.length}
+                      {t("tasks.failCount", { count: failed.length })}
                     </Tag>
                   )}
                   {hasJobError && failed.length === 0 && (
                     <Tag tone="danger">
-                      异常
+                      {t("tasks.anomaly")}
                     </Tag>
                   )}
                 </div>
@@ -888,7 +900,7 @@ function ExpandedJobDetails({
             icon={<RotateCcw className="size-3.5" />}
             onClick={onRetry}
           >
-            重试此任务
+            {t("tasks.retryJob")}
           </Button>
         )}
       </div>
@@ -900,7 +912,7 @@ function ExpandedJobDetails({
       {filesQuery.isLoading ? (
         <div className="py-6 text-center">
           <Spinner className="size-5 mx-auto" />
-          <p className="mt-2 text-xs text-fg-muted">正在获取已下载媒体文件清单...</p>
+          <p className="mt-2 text-xs text-fg-muted">{t("tasks.loadingFiles")}</p>
         </div>
       ) : filesQuery.isError ? (
         <Alert
@@ -909,7 +921,7 @@ function ExpandedJobDetails({
           description={getErrorMessage(filesQuery.error)}
           action={
             <Button size="sm" variant="default" onClick={() => void filesQuery.refetch()}>
-              重试
+              {t("common.retry")}
             </Button>
           }
         />
@@ -918,7 +930,7 @@ function ExpandedJobDetails({
           <Empty description={t("tasks.noDownloads")} />
         ) : job.status === "pending" || job.status === "resolving" || job.status === "downloading" ? (
           <div className="py-6 text-center text-xs text-fg-muted">
-            任务正在执行中，等待媒体拉取入库...
+            {t("tasks.jobRunningWait")}
           </div>
         ) : (
           <Empty description={t("gallery.empty")} />
@@ -933,7 +945,7 @@ function ExpandedJobDetails({
                 key: "downloads",
                 label: (
                   <span className="flex items-center gap-1.5">
-                    <span>已下载文件</span>
+                    <span>{t("tasks.downloadedFiles")}</span>
                     <Tag tone="success" className="font-mono text-[10px] px-1 py-0">
                       {downloads.length}
                     </Tag>
@@ -960,7 +972,7 @@ function ExpandedJobDetails({
         <div className="space-y-2 pt-2 border-t border-line">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-fg-muted">
-              已下载文件 ({downloads.length})
+              {t("tasks.downloadedFilesCount", { count: downloads.length })}
             </span>
           </div>
           {renderDownloadsList()}

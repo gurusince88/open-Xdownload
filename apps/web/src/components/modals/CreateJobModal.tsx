@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import React, { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   createArchiveSchedule,
   createJob,
@@ -40,32 +41,24 @@ const tabKeys: string[] = ["user", "tweet_link", "list", "following"];
 
 type BatchKind = Extract<JobKind, "user" | "list" | "following">;
 
-const batchTabs: {
+const batchTabMeta: {
   kind: BatchKind;
-  label: string;
   icon: React.ReactNode;
-  hint: string;
   placeholder: string;
 }[] = [
   {
     kind: "user",
-    label: "用户归档",
     icon: <User className="size-4" />,
-    hint: "支持用户名、@screen_name 或数字 ID，每行一个",
     placeholder: "elonmusk\n@sama\n44196397\nhttps://x.com/OpenAI",
   },
   {
     kind: "list",
-    label: "列表归档",
     icon: <ListIcon className="size-4" />,
-    hint: "输入 X 列表 ID 或完整列表 URL，自动获取列表成员推文媒体",
     placeholder: "1492019283\nhttps://x.com/i/lists/1647289190",
   },
   {
     kind: "following",
-    label: "关注关系归档",
     icon: <UserPlus className="size-4" />,
-    hint: "输入目标账号，自动获取其关注的所有账号并进行媒体归档",
     placeholder: "elonmusk\n@OpenAI",
   },
 ];
@@ -127,8 +120,29 @@ export function CreateJobModal({
   initialInput = "",
   initialKind = "user",
 }: CreateJobModalProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<string>("user");
+
+  const batchTabs = useMemo(
+    () =>
+      batchTabMeta.map((tab) => ({
+        ...tab,
+        label:
+          tab.kind === "user"
+            ? t("create.tabUserArchive")
+            : tab.kind === "list"
+              ? t("create.tabListArchive")
+              : t("create.tabFollowingArchive"),
+        hint:
+          tab.kind === "user"
+            ? t("create.hintUser")
+            : tab.kind === "list"
+              ? t("create.hintList")
+              : t("create.hintFollowing"),
+      })),
+    [t],
+  );
 
   const [tweetUrl, setTweetUrl] = useState("");
   const [batchInputs, setBatchInputs] = useState<Partial<Record<BatchKind, string>>>({});
@@ -173,33 +187,33 @@ export function CreateJobModal({
     onSuccess: (data) => {
       setParsedTweet(data);
       toast.success({
-        message: "推文解析成功",
-        description: `包含 ${data.media.length} 个媒体，作者 @${data.author.screenName}`,
+        message: t("create.parseOk"),
+        description: t("create.parseOkDesc", { count: data.media.length, user: data.author.screenName }),
       });
     },
-    onError: notifyError("解析失败"),
+    onError: notifyError(t("create.parseFailed")),
   });
 
   const createJobsMutation = useMutation({
     mutationFn: async () => {
       if (activeTab === "tweet_link") {
         const targetUrl = tweetUrl.trim();
-        if (!targetUrl) throw new Error("请输入推文链接");
+        if (!targetUrl) throw new Error(t("create.needTweetUrl"));
         const title = parsedTweet
-          ? `推文 @${parsedTweet.author.screenName} (${parsedTweet.id})`
+          ? t("create.tweetTitle", { user: parsedTweet.author.screenName, id: parsedTweet.id })
           : `Tweet ${targetUrl.split("/").pop() || targetUrl}`;
         return [await createJob("tweet_link", targetUrl, title)];
       }
 
       if (currentBatchItems.length === 0) {
-        throw new Error("请至少输入一个有效目标");
+        throw new Error(t("create.needTargets"));
       }
 
       if (scheduleMode) {
         const payload: ArchiveScheduleRequest = {
           name:
             scheduleName.trim() ||
-            `自动归档 (${currentBatchItems.length} 个目标)`,
+            t("create.autoArchiveName", { count: currentBatchItems.length }),
           enabled: true,
           intervalMinutes,
           items: currentBatchItems,
@@ -214,18 +228,18 @@ export function CreateJobModal({
       void invalidateWorkbenchQueries(queryClient);
       if (scheduleMode) {
         toast.success({
-          message: "定时归档计划已保存",
-          description: `执行频率: 每 ${intervalMinutes} 分钟`,
+          message: t("create.scheduleSaved"),
+          description: t("create.scheduleFreq", { minutes: intervalMinutes }),
         });
       } else {
         toast.success({
-          message: "任务创建成功",
-          description: `已成功入库 ${jobs.length} 个任务并开始后台下载`,
+          message: t("create.success"),
+          description: t("create.jobsCreatedDesc", { count: jobs.length }),
         });
       }
       handleClose();
     },
-    onError: notifyError("创建失败"),
+    onError: notifyError(t("create.createFailed")),
   });
 
   const handleClose = () => {
@@ -258,7 +272,7 @@ export function CreateJobModal({
           <div className="flex items-center justify-between text-xs text-fg-muted">
             <span>{tab.hint}</span>
             <span className="font-mono font-medium text-brand-600 dark:text-brand-400">
-              已识别: {currentBatchItems.length} 个
+              {t("create.recognized", { count: currentBatchItems.length })}
             </span>
           </div>
           <Textarea
@@ -278,7 +292,7 @@ export function CreateJobModal({
       label: (
         <span className="flex items-center gap-1.5">
           <LinkIcon className="size-4" />
-          <span>单条推文</span>
+          <span>{t("create.tabTweet")}</span>
         </span>
       ),
       children: (
@@ -300,7 +314,7 @@ export function CreateJobModal({
               onClick={handleParseTweet}
               className="shrink-0"
             >
-              解析推文
+              {t("create.parseTweet")}
             </Button>
           </div>
 
@@ -311,16 +325,16 @@ export function CreateJobModal({
                   @{parsedTweet.author.screenName} ({parsedTweet.author.name})
                 </span>
                 <span className="font-medium text-success">
-                  {parsedTweet.media.length} 个可用媒体
+                  {t("create.mediaAvailable", { count: parsedTweet.media.length })}
                 </span>
               </div>
               <p className="line-clamp-2 text-fg-body">
-                {parsedTweet.text || "无正文"}
+                {parsedTweet.text || t("create.noText")}
               </p>
               <div className="flex items-center gap-2 text-[11px] text-fg-subtle">
-                <span>推文 ID: {parsedTweet.id}</span>
+                <span>{t("create.tweetIdLabel", { id: parsedTweet.id })}</span>
                 <span>·</span>
-                <span>发布于: {parsedTweet.createdAt || "未知"}</span>
+                <span>{t("create.publishedAt", { date: parsedTweet.createdAt || t("create.unknownDate") })}</span>
               </div>
             </div>
           )}
@@ -346,10 +360,10 @@ export function CreateJobModal({
           </div>
           <div>
             <div className="text-base font-semibold text-fg">
-              新建下载任务 / 归档计划
+              {t("create.titleFull")}
             </div>
             <div className="text-xs text-fg-muted font-normal">
-              支持单条推文、批量用户时间线、列表与关注关系媒体高速入库
+              {t("create.subtitle")}
             </div>
           </div>
         </div>
@@ -358,14 +372,14 @@ export function CreateJobModal({
         <div className="flex w-full items-center justify-between">
           <span className="text-xs text-fg-subtle">
             {activeTab === "tweet_link"
-              ? "解析后点击立即下载入库"
+              ? t("create.footerParseHint")
               : scheduleMode
-              ? `将保存为包含 ${currentBatchItems.length} 个目标的定时计划`
-              : `将同时创建 ${currentBatchItems.length} 个后台下载任务`}
+              ? t("create.footerScheduleHint", { count: currentBatchItems.length })
+              : t("create.footerBatchHint", { count: currentBatchItems.length })}
           </span>
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={handleClose}>
-              取消
+              {t("common.cancel")}
             </Button>
             <Button
               variant="primary"
@@ -375,10 +389,10 @@ export function CreateJobModal({
               icon={<Download className="size-4" />}
             >
               {scheduleMode
-                ? "保存定时计划"
+                ? t("create.saveSchedule")
                 : activeTab === "tweet_link"
-                ? "立即下载"
-                : `批量下载 (${currentBatchItems.length})`}
+                ? t("create.downloadNow")
+                : t("create.batchDownloadCount", { count: currentBatchItems.length })}
             </Button>
           </div>
         </div>
@@ -401,7 +415,7 @@ export function CreateJobModal({
               <div className="flex items-center gap-2">
                 <Clock className="size-4 text-brand-500" />
                 <span className="text-xs font-semibold text-fg">
-                  是否保存为自动归档计划（定期抓取）？
+                  {t("create.asScheduleQ")}
                 </span>
               </div>
               <Checkbox
@@ -413,23 +427,23 @@ export function CreateJobModal({
             {isSchedule && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-line text-xs">
                 <div>
-                  <div className="mb-1 text-fg-muted font-medium">计划名称</div>
+                  <div className="mb-1 text-fg-muted font-medium">{t("create.planName")}</div>
                   <Input
                     value={scheduleName}
                     onChange={(e) => setScheduleName(e.target.value)}
-                    placeholder="例如：重点博主媒体日常归档"
+                    placeholder={t("create.planNamePlaceholder")}
                     size="sm"
                   />
                 </div>
                 <div>
-                  <div className="mb-1 text-fg-muted font-medium">调度频率 (分钟)</div>
+                  <div className="mb-1 text-fg-muted font-medium">{t("create.intervalLabel")}</div>
                   <NumberInput
                     min={5}
                     max={43200}
                     value={intervalMinutes}
                     onChange={(val) => setIntervalMinutes(val ?? 360)}
                     size="sm"
-                    addonAfter="分钟"
+                    addonAfter={t("create.minutesUnit")}
                   />
                 </div>
               </div>

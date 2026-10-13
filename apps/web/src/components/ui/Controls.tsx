@@ -7,6 +7,7 @@ import {
   ToggleGroup,
 } from "radix-ui";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/cn";
 import { Spinner } from "./Spinner";
 
@@ -19,7 +20,7 @@ export function Select({
   value,
   onChange,
   options,
-  placeholder = "请选择",
+  placeholder,
   size = "md",
   className,
   ariaLabel,
@@ -32,6 +33,8 @@ export function Select({
   className?: string;
   ariaLabel?: string;
 }) {
+  const { t } = useTranslation();
+  const resolvedPlaceholder = placeholder ?? t("ui.selectPlaceholder");
   return (
     <RadixSelect.Root value={value} onValueChange={onChange}>
       <RadixSelect.Trigger
@@ -44,7 +47,7 @@ export function Select({
           className,
         )}
       >
-        <RadixSelect.Value placeholder={placeholder} />
+        <RadixSelect.Value placeholder={resolvedPlaceholder} />
         <RadixSelect.Icon>
           <ChevronDown className="size-3.5 shrink-0 text-fg-subtle" />
         </RadixSelect.Icon>

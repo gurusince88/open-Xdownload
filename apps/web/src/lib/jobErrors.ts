@@ -1,3 +1,4 @@
+import i18n from "../i18n";
 import type { Job } from "./api";
 
 export interface AggregatedErrorGroup {
@@ -144,7 +145,7 @@ export function parseAggregatedErrors(errorText?: string): AggregatedErrorGroup[
     } else {
       groups.push({
         id: "err-1",
-        reason: "其他未明确原因异常",
+        reason: i18n.t("tasks.otherReason"),
         targets: [],
         count: trailerCount,
       });
@@ -171,17 +172,17 @@ export function getJobProgressDisplay(job: Job): {
     job.status === "downloading" ||
     job.status === "resolving"
   ) {
-    const msg = job.message || "执行中...";
+    const msg = job.message || i18n.t("tasks.statusRunning");
     return { displayMsg: msg, tooltip: msg, hasError: false };
   }
 
   if (job.status === "completed" && !job.error) {
-    const msg = job.message || "已完成";
+    const msg = job.message || i18n.t("tasks.statusDone");
     return { displayMsg: msg, tooltip: msg, hasError: false };
   }
 
   if (job.status === "canceled") {
-    const msg = job.message || "已取消";
+    const msg = job.message || i18n.t("tasks.statusCanceled");
     return { displayMsg: msg, tooltip: msg, hasError: false };
   }
 
@@ -189,14 +190,23 @@ export function getJobProgressDisplay(job: Job): {
 
   // 无可解析的错误组
   if (groups.length === 0) {
-    const msg = job.error || job.message || (isFailed ? "任务失败" : "执行中...");
+    const msg =
+      job.error ||
+      job.message ||
+      (isFailed ? i18n.t("tasks.statusFailed") : i18n.t("tasks.statusRunning"));
     return { displayMsg: msg, tooltip: msg, hasError };
   }
 
   // 单一错误且仅针对单个目标/单次
   if (groups.length === 1 && groups[0].count <= 1 && groups[0].targets.length <= 1) {
-    const msg = groups[0].reason || job.error || (isFailed ? "任务失败" : "部分异常");
-    const tooltip = job.message && job.message !== msg ? `${msg}\n状态: ${job.message}` : msg;
+    const msg =
+      groups[0].reason ||
+      job.error ||
+      (isFailed ? i18n.t("tasks.statusFailed") : i18n.t("tasks.partialAnomaly"));
+    const tooltip =
+      job.message && job.message !== msg
+        ? `${msg}\n${i18n.t("tasks.statusPrefix", { message: job.message })}`
+        : msg;
     return { displayMsg: msg, tooltip, hasError };
   }
 
@@ -204,9 +214,9 @@ export function getJobProgressDisplay(job: Job): {
   const totalCount = groups.reduce((acc, g) => acc + g.count, 0);
   let displayMsg: string;
   if (groups.length === 1) {
-    displayMsg = `${groups[0].reason} (${groups[0].count}项)`;
+    displayMsg = `${groups[0].reason} ${i18n.t("tasks.countItems", { count: groups[0].count })}`;
   } else {
-    displayMsg = `部分失败 (${totalCount}项)`;
+    displayMsg = i18n.t("tasks.partialFail", { count: totalCount });
   }
 
   const tooltipLines: string[] = [];
@@ -216,9 +226,11 @@ export function getJobProgressDisplay(job: Job): {
   for (const g of groups) {
     const targetsStr =
       g.targets.length > 0
-        ? ` (${g.targets.slice(0, 5).join("、")}${g.targets.length > 5 ? " 等" : ""})`
+        ? ` (${g.targets.slice(0, 5).join(", ")}${g.targets.length > 5 ? i18n.t("tasks.etc") : ""})`
         : "";
-    tooltipLines.push(`• ${g.reason} [${g.count}项]${targetsStr}`);
+    tooltipLines.push(
+      `• ${g.reason} ${i18n.t("tasks.countBracket", { count: g.count })}${targetsStr}`,
+    );
   }
 
   return {

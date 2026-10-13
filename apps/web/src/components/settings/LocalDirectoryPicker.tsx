@@ -1,6 +1,7 @@
 import { ArrowUp, Folder, FolderPlus, RefreshCw } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   createLocalDirectory,
   listLocalDirectories,
@@ -35,6 +36,7 @@ export function LocalDirectoryPicker({
   path: string;
   onSelect: (path: string) => void;
 }) {
+  const { t } = useTranslation();
   const [rootPath, setRootPath] = useState(path);
   const [selectedPath, setSelectedPath] = useState(path);
   const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
@@ -55,9 +57,9 @@ export function LocalDirectoryPicker({
       const rootNode = listingToDirectoryTreeRoot(data);
       setTreeData([rootNode]);
       setExpandedKeys([rootNode.key]);
-      toast.success({ message: "目录已创建并选择" });
+      toast.success({ message: t("settings.dirCreated") });
     },
-    onError: notifyError("创建目录失败"),
+    onError: notifyError(t("settings.createDirFailed")),
   });
 
   const resolvedPath = listing.data?.path ?? rootPath;
@@ -102,7 +104,7 @@ export function LocalDirectoryPicker({
     } catch (error) {
       if (controller?.signal.aborted) return;
       toast.error({
-        message: "读取目录失败",
+        message: t("settings.readDirFailed"),
         description: getErrorMessage(error),
       });
     }
@@ -137,7 +139,7 @@ export function LocalDirectoryPicker({
           onClick={openSelectedPath}
           disabled={!selectedPath.trim() || listing.isLoading}
         >
-          打开
+          {t("common.open")}
         </Button>
         <Button
           variant="secondary"
@@ -146,14 +148,14 @@ export function LocalDirectoryPicker({
           loading={createDirectory.isPending}
           disabled={!selectedPath.trim()}
         >
-          创建
+          {t("common.create")}
         </Button>
         <Button
           variant="primary"
           onClick={() => onSelect(selectedPath.trim())}
           disabled={!selectedPath.trim()}
         >
-          选择此目录
+          {t("settings.selectDir")}
         </Button>
       </div>
 
@@ -167,7 +169,7 @@ export function LocalDirectoryPicker({
               disabled={!listing.data?.parent || listing.isLoading}
               onClick={() => listing.data?.parent && setRootPath(listing.data.parent)}
             >
-              上级目录
+              {t("settings.parentDir")}
             </Button>
             <EllipsisText
               title={resolvedPath}
@@ -175,14 +177,14 @@ export function LocalDirectoryPicker({
             >
               {resolvedPath}
             </EllipsisText>
-            <Tooltip content="刷新目录">
+            <Tooltip content={t("settings.refreshDir")}>
               <Button
                 size="sm"
                 variant="ghost"
                 circle
                 icon={<RefreshCw className={`size-3.5 ${listing.isFetching ? "animate-spin" : ""}`} />}
                 onClick={() => listing.refetch()}
-                aria-label="刷新目录"
+                aria-label={t("settings.refreshDir")}
               />
             </Tooltip>
           </Toolbar>
@@ -190,7 +192,7 @@ export function LocalDirectoryPicker({
           {listing.isError && (
             <Alert
               type="error"
-              message="读取目录失败"
+              message={t("settings.readDirFailed")}
               description={listing.error.message}
             />
           )}
@@ -210,7 +212,7 @@ export function LocalDirectoryPicker({
                 loadChildren={loadDirectoryNode}
               />
             ) : (
-              <AppEmpty description="没有子目录" />
+              <AppEmpty description={t("settings.noSubdirs")} />
             )}
           </div>
         </Stack>

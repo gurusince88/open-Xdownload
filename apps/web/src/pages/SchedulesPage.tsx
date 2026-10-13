@@ -53,11 +53,11 @@ export function SchedulesPage({
     onSuccess: (updated) => {
       void invalidateWorkbenchQueries(queryClient);
       toast.success({
-        message: updated.enabled ? "定时计划已启用" : "定时计划已暂停",
-        description: `计划 “${updated.name}” 状态更新成功`,
+        message: updated.enabled ? t("schedules.enabled") : t("schedules.pausedToast"),
+        description: t("schedules.statusUpdated", { name: updated.name }),
       });
     },
-    onError: notifyError("更新失败"),
+    onError: notifyError(t("schedules.updateFailed")),
   });
 
   const runSchedule = useMutation({
@@ -65,11 +65,11 @@ export function SchedulesPage({
     onSuccess: (jobs) => {
       void invalidateWorkbenchQueries(queryClient);
       toast.success({
-        message: "计划运行已触发",
-        description: `已生成并排入 ${jobs.length} 个下载任务`,
+        message: t("schedules.runTriggered"),
+        description: t("schedules.jobsQueued", { count: jobs.length }),
       });
     },
-    onError: notifyError("执行失败"),
+    onError: notifyError(t("schedules.runFailed")),
   });
 
   const removeSchedule = useMutation({
@@ -77,10 +77,10 @@ export function SchedulesPage({
     onSuccess: () => {
       void invalidateWorkbenchQueries(queryClient);
       toast.success({
-        message: "计划已删除",
+        message: t("schedules.deleted"),
       });
     },
-    onError: notifyError("删除失败"),
+    onError: notifyError(t("schedules.deleteFailed")),
   });
 
   return (
@@ -122,7 +122,7 @@ export function SchedulesPage({
               <div className="space-y-1.5">
                 <div className="font-semibold text-sm text-fg">{t("schedules.empty")}</div>
                 <p className="text-xs text-fg-muted max-w-md mx-auto">
-                  您可以把常用关注的 X 博主、列表或推文账号加入自动计划，系统将按设置的频率自动同步最新媒体，免去手动重复输入的繁琐。
+                  {t("schedules.emptyDesc")}
                 </p>
               </div>
             }
@@ -162,7 +162,7 @@ export function SchedulesPage({
                     checked={schedule.enabled}
                     loading={toggleEnabled.isPending && toggleEnabled.variables?.id === schedule.id}
                     onChange={() => toggleEnabled.mutate(schedule)}
-                    ariaLabel={`切换计划 ${schedule.name} 状态`}
+                    ariaLabel={t("schedules.toggleAria", { name: schedule.name })}
                   />
                 </div>
               }
@@ -188,7 +188,7 @@ export function SchedulesPage({
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-[11px] text-fg-subtle">
                   <span>{t("schedules.targets")}</span>
-                  <span>{schedule.items.length} 个目标</span>
+                  <span>{t("schedules.targetCount", { count: schedule.items.length })}</span>
                 </div>
                 <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
                   {schedule.items.map((item, idx) => (
@@ -207,13 +207,13 @@ export function SchedulesPage({
               {/* 上次运行与操作栏 */}
               <div className="flex items-center justify-between pt-2 border-t border-line text-xs">
                 <span className="text-[11px] text-fg-subtle font-mono truncate max-w-[150px]">
-                  上次: {schedule.lastRunAt ? formatDateTime(schedule.lastRunAt) : "从未"}
+                  {t("schedules.lastPrefix", { time: schedule.lastRunAt ? formatDateTime(schedule.lastRunAt) : t("schedules.lastNever") })}
                 </span>
 
                 <div className="flex items-center gap-1.5">
                   <Popconfirm
-                    title="删除定时计划"
-                    description={`确定删除计划 “${schedule.name}”？已下载的媒体文件不受影响。`}
+                    title={t("schedules.deleteTitle")}
+                    description={t("schedules.deleteConfirm", { name: schedule.name })}
                     okText={t("common.delete")}
                     cancelText={t("common.cancel")}
                     onConfirm={() => removeSchedule.mutate(schedule.id)}
@@ -223,7 +223,7 @@ export function SchedulesPage({
                       size="sm"
                       icon={<Trash2 className="size-3.5 text-danger" />}
                       loading={removeSchedule.isPending && removeSchedule.variables === schedule.id}
-                      aria-label="删除计划"
+                      aria-label={t("schedules.deleteAria")}
                     />
                   </Popconfirm>
 

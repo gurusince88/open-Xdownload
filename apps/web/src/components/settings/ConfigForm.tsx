@@ -114,13 +114,13 @@ export function ConfigForm({
       }
       if (result.ok) {
         toast.success({
-          message: "Cookie 检测通过",
+          message: t("settings.cookiePass"),
           description: result.screenName ? `@${result.screenName}` : result.message,
         });
         return;
       }
       toast.warning({
-        message: "Cookie 检测未通过",
+        message: t("settings.cookieFail"),
         description: result.message,
       });
     } catch (error) {
@@ -132,7 +132,7 @@ export function ConfigForm({
       setAuthError(message);
       if (notify) {
         toast.error({
-          message: "Cookie 检测失败",
+          message: t("settings.cookieCheckError"),
           description: message,
         });
       }
@@ -158,21 +158,21 @@ export function ConfigForm({
       {/* 页头 + 浮动操作区 */}
       <div className="sticky top-0 z-10 -mx-4 -mt-4 bg-canvas/80 px-4 pt-4 pb-3 backdrop-blur-md border-b border-line flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-fg">系统与存储配置</h1>
+          <h1 className="text-xl font-bold tracking-tight text-fg">{t("settings.pageTitle")}</h1>
           <p className="mt-0.5 text-xs text-fg-muted">
-            存储位置、网络代理与 X Cookie 集中管理，修改后点击右上角统一保存
+            {t("settings.pageSubtitle")}
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <Tooltip content="重新加载配置">
+          <Tooltip content={t("settings.reloadConfig")}>
             <Button
               variant="secondary"
               circle
               icon={<RefreshCw className={`size-3.5 ${refreshPending ? "animate-spin" : ""}`} />}
               loading={refreshPending}
               onClick={onRefresh}
-              aria-label="重新加载配置"
+              aria-label={t("settings.reloadConfig")}
             />
           </Tooltip>
           <Button
@@ -181,7 +181,7 @@ export function ConfigForm({
             loading={authChecking}
             onClick={() => void runAuthCheck(draft, true)}
           >
-            检测 Cookie
+            {t("settings.detectCookie")}
           </Button>
           <Button
             variant="primary"
@@ -189,23 +189,23 @@ export function ConfigForm({
             loading={mutation.isPending}
             onClick={() => mutation.mutate(draft)}
           >
-            保存配置
+            {t("settings.save")}
           </Button>
         </div>
       </div>
 
       <SectionCard
         icon={<HardDrive className="size-4" />}
-        title="存储设置"
-        description="选择媒体下载文件的保存方式与目标目录"
+        title={t("settings.storageSection")}
+        description={t("settings.storageDesc")}
       >
         <StorageSettings draft={draft} onChange={updateDraft} />
       </SectionCard>
 
       <SectionCard
         icon={<Download className="size-4" />}
-        title="网络与下载调度"
-        description="控制代理连接、文件命名方式与下载相关开关"
+        title={t("settings.networkSection")}
+        description={t("settings.networkDesc")}
       >
         <DownloadSettingsFields
           draft={draft}
@@ -216,8 +216,8 @@ export function ConfigForm({
 
       <SectionCard
         icon={<ShieldCheck className="size-4" />}
-        title="X / Twitter Cookie 凭证"
-        description="配置主账号与备用多账号凭证池，用于规避 API 频率限制"
+        title={t("settings.cookieSection")}
+        description={t("settings.cookieDesc")}
       >
         <CookieSettingsFields
           authError={authError}
@@ -234,22 +234,23 @@ export function ConfigForm({
 }
 
 function ThemeSettingsSection() {
+  const { t } = useTranslation();
   const { preference, setPreference, accent, setAccent } = useTheme();
 
   return (
     <SectionCard
       icon={<Palette className="size-4 text-brand-500" />}
-      title="界面外观与个性化主题"
-      description="定制系统的明暗视觉风格与强调色，设置即刻生效并持久保存在本地"
+      title={t("settings.themeSection")}
+      description={t("settings.themeDesc")}
     >
       <div className="space-y-4">
         <div>
-          <label className="text-xs font-semibold text-fg">明暗主题模式</label>
+          <label className="text-xs font-semibold text-fg">{t("settings.themeMode")}</label>
           <div className="mt-2 flex flex-wrap gap-2">
             {[
-              { id: "system", label: "跟随系统偏好", icon: <Monitor className="size-3.5" /> },
-              { id: "light", label: "浅色明亮模式", icon: <Sun className="size-3.5" /> },
-              { id: "dark", label: "深色黑曜石模式 (OLED)", icon: <Moon className="size-3.5" /> },
+              { id: "system", label: t("settings.themeSystem"), icon: <Monitor className="size-3.5" /> },
+              { id: "light", label: t("settings.themeLight"), icon: <Sun className="size-3.5" /> },
+              { id: "dark", label: t("settings.themeDark"), icon: <Moon className="size-3.5" /> },
             ].map((mode) => (
               <button
                 key={mode.id}
@@ -270,7 +271,7 @@ function ThemeSettingsSection() {
         </div>
 
         <div>
-          <label className="text-xs font-semibold text-fg">主题强调色 (Theme Accent)</label>
+          <label className="text-xs font-semibold text-fg">{t("settings.themeAccent")}</label>
           <div className="mt-2 grid grid-cols-2 gap-2.5 sm:grid-cols-5">
             {THEME_ACCENTS.map((opt) => {
               const active = accent === opt.id;

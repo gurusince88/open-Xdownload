@@ -1,3 +1,5 @@
+import i18n from "../i18n";
+
 export type JobStatus =
   | "pending"
   | "resolving"
@@ -280,7 +282,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     const message =
       (typeof payload?.error === "string" && payload.error) ||
       response.statusText ||
-      `请求失败 (${response.status})`;
+      i18n.t("common.requestFailed", { status: response.status });
     throw new ApiError(message, response.status);
   }
   return response.json() as Promise<T>;

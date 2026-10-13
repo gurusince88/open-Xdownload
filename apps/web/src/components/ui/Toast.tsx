@@ -1,6 +1,7 @@
 import { AlertCircle, CheckCircle2, Info, TriangleAlert, X } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/cn";
 
 export type ToastVariant = "success" | "error" | "warning" | "info";
@@ -71,6 +72,7 @@ const variantMeta: Record<ToastVariant, { icon: React.ReactNode; accent: string 
 };
 
 function ToastItem({ record }: { record: ToastRecord }) {
+  const { t } = useTranslation();
   const [paused, setPaused] = useState(false);
   const remainingRef = useRef(record.duration ?? DEFAULT_DURATION);
   const startedRef = useRef(Date.now());
@@ -105,7 +107,7 @@ function ToastItem({ record }: { record: ToastRecord }) {
       </div>
       <button
         type="button"
-        aria-label="关闭提示"
+        aria-label={t("ui.closeToast")}
         onClick={() => dismiss(record.id)}
         className="shrink-0 cursor-pointer rounded p-0.5 text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg-body"
       >
@@ -117,6 +119,7 @@ function ToastItem({ record }: { record: ToastRecord }) {
 
 // 挂在 App 顶层一次即可。用 portal 到 body，避免被页面的 overflow 裁掉。
 export function Toaster() {
+  const { t } = useTranslation();
   const [items, setItems] = useState<ToastRecord[]>(toasts);
 
   useEffect(() => {
@@ -132,7 +135,7 @@ export function Toaster() {
     <div
       className="pointer-events-none fixed top-4 right-4 z-[1300] flex flex-col items-end gap-2"
       role="region"
-      aria-label="通知"
+      aria-label={t("ui.notifications")}
     >
       {/* aria-live 容器常驻，内容变化才会被播报；
           若整个容器随通知一起挂载/卸载，读屏可能读不到。 */}
