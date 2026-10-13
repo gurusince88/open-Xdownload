@@ -6,6 +6,7 @@ import {
   Users,
 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import React from "react";
 import {
   deleteArchiveSchedule,
@@ -38,6 +39,7 @@ export function SchedulesPage({
   loading = false,
   onOpenCreateModal,
 }: SchedulesPageProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const toggleEnabled = useMutation({
@@ -86,9 +88,9 @@ export function SchedulesPage({
       {/* 顶部标题与行动 */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-1">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-fg">自动归档计划</h1>
+          <h1 className="text-xl font-bold tracking-tight text-fg">{t("schedules.title")}</h1>
           <p className="mt-0.5 text-xs text-fg-muted">
-            配置定时轮询任务，定时扫描指定用户时间线、列表或关注成员，自动同步最新媒体
+            {t("schedules.subtitle")}
           </p>
         </div>
         <Button
@@ -96,7 +98,7 @@ export function SchedulesPage({
           icon={<Plus className="size-4" />}
           onClick={onOpenCreateModal}
         >
-          新建归档计划
+          {t("schedules.new")}
         </Button>
       </div>
 
@@ -118,7 +120,7 @@ export function SchedulesPage({
           <Empty
             description={
               <div className="space-y-1.5">
-                <div className="font-semibold text-sm text-fg">暂无定时归档计划</div>
+                <div className="font-semibold text-sm text-fg">{t("schedules.empty")}</div>
                 <p className="text-xs text-fg-muted max-w-md mx-auto">
                   您可以把常用关注的 X 博主、列表或推文账号加入自动计划，系统将按设置的频率自动同步最新媒体，免去手动重复输入的繁琐。
                 </p>
@@ -132,7 +134,7 @@ export function SchedulesPage({
               onClick={onOpenCreateModal}
               className="mt-2"
             >
-              立即创建第一个计划
+              {t("schedules.createFirst")}
             </Button>
           </Empty>
         </Card>
@@ -154,7 +156,7 @@ export function SchedulesPage({
               extra={
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] text-fg-muted font-normal">
-                    {schedule.enabled ? "运行中" : "已暂停"}
+                    {schedule.enabled ? t("schedules.running") : t("schedules.paused")}
                   </span>
                   <Switch
                     checked={schedule.enabled}
@@ -169,15 +171,15 @@ export function SchedulesPage({
               {/* 核心参数 */}
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="rounded-control bg-surface-muted/60 p-2 border border-line/60">
-                  <span className="text-fg-subtle block text-[11px]">执行周期</span>
+                  <span className="text-fg-subtle block text-[11px]">{t("schedules.intervalLabel")}</span>
                   <span className="font-medium text-fg mt-0.5 block">
                     {formatIntervalMinutes(schedule.intervalMinutes)}
                   </span>
                 </div>
                 <div className="rounded-control bg-surface-muted/60 p-2 border border-line/60">
-                  <span className="text-fg-subtle block text-[11px]">下次运行</span>
+                  <span className="text-fg-subtle block text-[11px]">{t("schedules.nextRun")}</span>
                   <span className="font-mono text-fg mt-0.5 block truncate" title={schedule.nextRunAt}>
-                    {schedule.nextRunAt ? formatDateTime(schedule.nextRunAt) : "计算中"}
+                    {schedule.nextRunAt ? formatDateTime(schedule.nextRunAt) : t("schedules.calculating")}
                   </span>
                 </div>
               </div>
@@ -185,7 +187,7 @@ export function SchedulesPage({
               {/* 目标列表标签 */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-[11px] text-fg-subtle">
-                  <span>目标清单</span>
+                  <span>{t("schedules.targets")}</span>
                   <span>{schedule.items.length} 个目标</span>
                 </div>
                 <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
@@ -212,8 +214,8 @@ export function SchedulesPage({
                   <Popconfirm
                     title="删除定时计划"
                     description={`确定删除计划 “${schedule.name}”？已下载的媒体文件不受影响。`}
-                    okText="删除"
-                    cancelText="取消"
+                    okText={t("common.delete")}
+                    cancelText={t("common.cancel")}
                     onConfirm={() => removeSchedule.mutate(schedule.id)}
                   >
                     <Button
@@ -232,7 +234,7 @@ export function SchedulesPage({
                     loading={runSchedule.isPending && runSchedule.variables === schedule.id}
                     onClick={() => runSchedule.mutate(schedule.id)}
                   >
-                    立即执行
+                    {t("schedules.runNow")}
                   </Button>
                 </div>
               </div>

@@ -13,6 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { getJobProgressDisplay, parseAggregatedErrors } from "../lib/jobErrors";
 import {
@@ -102,6 +103,7 @@ export function TaskCenterPage({
   onOpenCreateModal,
   onOpenFailedDrawer,
 }: TaskCenterPageProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<StatusFilterType>("all");
   const [kindFilter, setKindFilter] = useState<string>("all");
@@ -116,9 +118,9 @@ export function TaskCenterPage({
     mutationFn: cancelJob,
     onSuccess: () => {
       void invalidateWorkbenchQueries(queryClient);
-      toast.success({ message: "任务已取消" });
+      toast.success({ message: t("tasks.statusCanceled") });
     },
-    onError: notifyError("取消失败"),
+    onError: notifyError(t("failed.retryFailed")),
   });
 
   const retry = useMutation({
@@ -240,7 +242,7 @@ export function TaskCenterPage({
     },
     {
       key: "progress",
-      title: "执行进度",
+      title: t("tasks.progress"),
       width: 220,
       render: (record) => {
         const percent = clampPercent(record.progress);
@@ -338,9 +340,9 @@ export function TaskCenterPage({
       {/* 顶部标题与操作栏 */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-1">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-fg">任务调度中心</h1>
+          <h1 className="text-xl font-bold tracking-tight text-fg">{t("tasks.title")}</h1>
           <p className="mt-0.5 text-xs text-fg-muted">
-            监控所有已创建的推文与归档任务、过滤检索并查看下载文件记录
+            {t("tasks.subtitle")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
@@ -350,7 +352,7 @@ export function TaskCenterPage({
               icon={<AlertCircle className="size-4" />}
               onClick={onOpenFailedDrawer}
             >
-              失败记录 ({failedTweetCount})
+              {t("tasks.failedRecords", { count: failedTweetCount })}
             </Button>
           )}
           <Button
@@ -358,7 +360,7 @@ export function TaskCenterPage({
             icon={<Plus className="size-4" />}
             onClick={onOpenCreateModal}
           >
-            新建下载 / 归档
+            {t("tasks.newJob")}
           </Button>
         </div>
       </div>
@@ -370,7 +372,7 @@ export function TaskCenterPage({
           className="relative overflow-hidden border-t-2 border-t-brand-500 bg-gradient-to-b from-brand-500/[0.04] to-transparent hover:-translate-y-0.5 hover:shadow-raised transition-all duration-200 cursor-default"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-fg-muted">下载中任务</span>
+            <span className="text-xs font-medium text-fg-muted">{t("tasks.cardActive")}</span>
             <div className="flex size-7 items-center justify-center rounded-lg bg-brand-500/10">
               <StatusDot tone={displayStats.active > 0 ? "brand" : "default"} pulse={displayStats.active > 0} />
             </div>
@@ -378,7 +380,7 @@ export function TaskCenterPage({
           <div className="mt-2 text-3xl font-bold tracking-tight font-mono tabular-nums text-fg">
             {displayStats.active}
           </div>
-          <p className="mt-0.5 text-[11px] text-fg-subtle">当前正在排队与拉取</p>
+          <p className="mt-0.5 text-[11px] text-fg-subtle">{t("tasks.statQueuing")}</p>
         </Card>
 
         <Card
@@ -386,7 +388,7 @@ export function TaskCenterPage({
           className="relative overflow-hidden border-t-2 border-t-success bg-gradient-to-b from-success/[0.04] to-transparent hover:-translate-y-0.5 hover:shadow-raised transition-all duration-200 cursor-default"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-fg-muted">已完成</span>
+            <span className="text-xs font-medium text-fg-muted">{t("tasks.statusDone")}</span>
             <div className="flex size-7 items-center justify-center rounded-lg bg-success-soft">
               <CheckCircle2 className="size-3.5 text-success" />
             </div>
@@ -394,7 +396,7 @@ export function TaskCenterPage({
           <div className="mt-2 text-3xl font-bold tracking-tight font-mono tabular-nums text-fg">
             {displayStats.completed}
           </div>
-          <p className="mt-0.5 text-[11px] text-fg-subtle">媒体已全部入库</p>
+          <p className="mt-0.5 text-[11px] text-fg-subtle">{t("tasks.statCompleted")}</p>
         </Card>
 
         <Card
@@ -402,7 +404,7 @@ export function TaskCenterPage({
           className="relative overflow-hidden border-t-2 border-t-danger bg-gradient-to-b from-danger/[0.04] to-transparent hover:-translate-y-0.5 hover:shadow-raised transition-all duration-200 cursor-default"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-fg-muted">异常 / 失败</span>
+            <span className="text-xs font-medium text-fg-muted">{t("tasks.cardFailed")}</span>
             <div className="flex size-7 items-center justify-center rounded-lg bg-danger-soft">
               <AlertCircle className="size-3.5 text-danger" />
             </div>
@@ -410,7 +412,7 @@ export function TaskCenterPage({
           <div className="mt-2 text-3xl font-bold tracking-tight font-mono tabular-nums text-fg">
             {displayStats.failed}
           </div>
-          <p className="mt-0.5 text-[11px] text-fg-subtle">包含部分失败与致命失败</p>
+          <p className="mt-0.5 text-[11px] text-fg-subtle">{t("tasks.statFailed")}</p>
         </Card>
 
         <Card
@@ -418,7 +420,7 @@ export function TaskCenterPage({
           className="relative overflow-hidden border-t-2 border-t-line-strong bg-gradient-to-b from-surface-muted/50 to-transparent hover:-translate-y-0.5 hover:shadow-raised transition-all duration-200 cursor-default"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-fg-muted">任务总数</span>
+            <span className="text-xs font-medium text-fg-muted">{t("tasks.cardTotal")}</span>
             <div className="flex size-7 items-center justify-center rounded-lg bg-surface-muted border border-line">
               <FolderCheck className="size-3.5 text-brand-500" />
             </div>
@@ -426,7 +428,7 @@ export function TaskCenterPage({
           <div className="mt-2 text-3xl font-bold tracking-tight font-mono tabular-nums text-fg">
             {displayStats.total}
           </div>
-          <p className="mt-0.5 text-[11px] text-fg-subtle">库内已记录的任务总规模</p>
+          <p className="mt-0.5 text-[11px] text-fg-subtle">{t("tasks.statTotal")}</p>
         </Card>
       </div>
 
@@ -441,22 +443,22 @@ export function TaskCenterPage({
                 value={statusFilter}
                 onChange={(val) => setStatusFilter(val as StatusFilterType)}
                 options={[
-                  { label: `全部 (${jobs.length})`, value: "all" },
+                  { label: t("tasks.filterAll", { count: jobs.length }), value: "all" },
                   {
                     label: (
                       <span className="flex items-center gap-1.5">
                         {bucketCounts.active > 0 && <span className="size-1.5 rounded-full bg-brand-500 animate-pulse" />}
-                        <span>下载中 ({bucketCounts.active})</span>
+                        <span>{t("tasks.filterActive", { count: bucketCounts.active })}</span>
                       </span>
                     ),
                     value: "active",
                   },
-                  { label: `已完成 (${bucketCounts.completed})`, value: "completed" },
+                  { label: t("tasks.filterCompleted", { count: bucketCounts.completed }), value: "completed" },
                   {
                     label: (
                       <span className="flex items-center gap-1.5">
                         {bucketCounts.failed > 0 && <span className="size-1.5 rounded-full bg-danger" />}
-                        <span>失败/异常 ({bucketCounts.failed})</span>
+                        <span>{t("tasks.filterFailed", { count: bucketCounts.failed })}</span>
                       </span>
                     ),
                     value: "failed",
@@ -469,7 +471,7 @@ export function TaskCenterPage({
           {/* 搜索与类型选择 */}
           <div className="flex flex-wrap items-center gap-2">
             <SearchInput
-              placeholder="按标题、用户名、错误信息或 ID 搜索..."
+              placeholder={t("tasks.searchPlaceholder")}
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               allowClear
@@ -481,7 +483,7 @@ export function TaskCenterPage({
               onChange={setKindFilter}
               className="w-36"
               options={[
-                { value: "all", label: "全部任务类型" },
+                { value: "all", label: t("tasks.allKinds") },
                 { value: "tweet_link", label: "单条推文" },
                 { value: "user", label: "用户媒体" },
                 { value: "list", label: "列表媒体" },
@@ -499,7 +501,7 @@ export function TaskCenterPage({
                 loading={retryAllFailed.isPending}
                 onClick={() => retryAllFailed.mutate()}
               >
-                重试失败推文
+                {t("tasks.retryFailedTweets")}
               </Button>
             )}
           </div>
@@ -543,6 +545,7 @@ export function TaskCenterPage({
 }
 
 function JobErrorAlert({ job }: { job: Job }) {
+  const { t } = useTranslation();
   const groups = useMemo(() => parseAggregatedErrors(job.error), [job.error]);
   const [copied, setCopied] = useState(false);
   const copiedTimerRef = useRef<number | null>(null);
@@ -584,7 +587,7 @@ function JobErrorAlert({ job }: { job: Job }) {
     }, 2000);
   };
 
-  const title = job.status === "failed" ? "任务执行失败" : "任务处理存在异常或部分失败";
+  const title = job.status === "failed" ? t("tasks.jobFailed") : t("tasks.jobPartial");
 
   return (
     <Alert
@@ -601,7 +604,7 @@ function JobErrorAlert({ job }: { job: Job }) {
             onClick={() => void handleCopy()}
             icon={copied ? <Check className="size-3 text-success" /> : <Copy className="size-3" />}
           >
-            {copied ? "已复制诊断信息" : "复制错误信息"}
+            {copied ? t("tasks.copiedDiag") : t("tasks.copyDiag")}
           </Button>
         </div>
       }
@@ -702,6 +705,7 @@ function ExpandedJobDetails({
   job: Job;
   onRetry: () => void;
 }) {
+  const { t } = useTranslation();
   const filesQuery = useQuery({
     queryKey: [...jobFilesQueryRoot, job.id],
     queryFn: ({ signal }) => getJobFiles(job.id, signal),
@@ -732,7 +736,7 @@ function ExpandedJobDetails({
       items={downloads}
       pageSize={6}
       itemName="个文件"
-      emptyDescription="暂无下载文件记录"
+      emptyDescription={t("tasks.noDownloads")}
       renderItem={(item) => {
         const fileName = item.filePath.split("/").pop() || item.filePath;
         const ext = fileName.split(".").pop()?.toUpperCase() || "FILE";
@@ -778,8 +782,8 @@ function ExpandedJobDetails({
                   size="sm"
                   circle
                   icon={<Copy className="size-3.5" />}
-                  onClick={() => void copyToClipboard(item.filePath, "本地路径")}
-                  aria-label="复制本地路径"
+                  onClick={() => void copyToClipboard(item.filePath, t("tasks.localPath"))}
+                  aria-label={t("tasks.copyLocalPath")}
                 />
               </Tooltip>
             </div>
@@ -794,7 +798,7 @@ function ExpandedJobDetails({
       items={failed}
       pageSize={6}
       itemName="条失败记录"
-      emptyDescription="暂无失败媒体记录"
+      emptyDescription={t("failed.empty")}
       renderItem={(item) => (
         <div className="flex items-center justify-between gap-3 text-xs">
           <div className="flex min-w-0 flex-1 items-start gap-2.5">
@@ -803,7 +807,7 @@ function ExpandedJobDetails({
             </div>
             <div className="min-w-0 flex-1 space-y-0.5">
               <div className="font-medium text-danger break-all">
-                {item.error || "媒体下载失败"}
+                {item.error || t("tasks.statusFailed")}
               </div>
               <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px] text-fg-muted">
                 <span
@@ -821,14 +825,14 @@ function ExpandedJobDetails({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <Tooltip title="复制媒体地址">
+            <Tooltip title={t("tasks.copyMediaUrl")}>
               <Button
                 variant="ghost"
                 size="sm"
                 circle
                 icon={<Copy className="size-3.5" />}
-                onClick={() => void copyToClipboard(item.mediaUrl, "媒体地址")}
-                aria-label="复制媒体地址"
+                onClick={() => void copyToClipboard(item.mediaUrl, t("tasks.mediaUrl"))}
+                aria-label={t("tasks.copyMediaUrl")}
               />
             </Tooltip>
           </div>
@@ -901,7 +905,7 @@ function ExpandedJobDetails({
       ) : filesQuery.isError ? (
         <Alert
           type="error"
-          message="读取文件清单失败"
+          message={t("app.jobsLoadFailed")}
           description={getErrorMessage(filesQuery.error)}
           action={
             <Button size="sm" variant="default" onClick={() => void filesQuery.refetch()}>
@@ -911,13 +915,13 @@ function ExpandedJobDetails({
         />
       ) : downloads.length === 0 && failed.length === 0 ? (
         hasJobError ? (
-          <Empty description="任务未生成已下载文件记录" />
+          <Empty description={t("tasks.noDownloads")} />
         ) : job.status === "pending" || job.status === "resolving" || job.status === "downloading" ? (
           <div className="py-6 text-center text-xs text-fg-muted">
             任务正在执行中，等待媒体拉取入库...
           </div>
         ) : (
-          <Empty description="暂无已归档的文件记录" />
+          <Empty description={t("gallery.empty")} />
         )
       ) : downloads.length > 0 && failed.length > 0 ? (
         <div className="pt-2 border-t border-line">
@@ -941,7 +945,7 @@ function ExpandedJobDetails({
                 key: "failed",
                 label: (
                   <span className="flex items-center gap-1.5">
-                    <span className="text-danger">失败媒体</span>
+                    <span className="text-danger">{t("tasks.failedMedia")}</span>
                     <Tag tone="danger" className="font-mono text-[10px] px-1 py-0">
                       {failed.length}
                     </Tag>
@@ -965,7 +969,7 @@ function ExpandedJobDetails({
         <div className="space-y-2 pt-2 border-t border-line">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-danger">
-              失败媒体 ({failed.length})
+              {t("tasks.failedMediaCount", { count: failed.length })}
             </span>
           </div>
           {renderFailedList()}

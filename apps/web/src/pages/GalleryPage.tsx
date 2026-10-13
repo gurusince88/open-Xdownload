@@ -9,6 +9,7 @@ import {
   Video,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import React, {
   useCallback,
   useDeferredValue,
@@ -226,6 +227,7 @@ const GalleryCard = React.memo(function GalleryCard({
 });
 
 export function GalleryPage({ downloads }: GalleryPageProps) {
+  const { t } = useTranslation();
   const [filterType, setFilterType] = useState<string>("all");
   const [searchFilter, setSearchFilter] = useState<string>("");
   const [userFilter, setUserFilter] = useState<string>("all");
@@ -368,7 +370,7 @@ export function GalleryPage({ downloads }: GalleryPageProps) {
       {/* 顶部标题与筛选工具栏 */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-1">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-fg">媒体归档库</h1>
+          <h1 className="text-xl font-bold tracking-tight text-fg">{t("gallery.title")}</h1>
           <p className="mt-0.5 text-xs text-fg-muted">
             集中浏览所有已下载的高清图片、动态 GIF 与 4K 视频原片
           </p>
@@ -391,7 +393,7 @@ export function GalleryPage({ downloads }: GalleryPageProps) {
             <SearchSelect
               value={userFilter}
               onChange={setUserFilter}
-              options={[{ value: "all", label: "全部用户" }, ...userOptions]}
+              options={[{ value: "all", label: t("gallery.allUsers") }, ...userOptions]}
               placeholder="按用户筛选..."
             />
           </div>

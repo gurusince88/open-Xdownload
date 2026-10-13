@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import React from "react";
 import type { AppConfig } from "../lib/api";
 import { ConfigForm } from "../components/settings/ConfigForm";
@@ -13,6 +14,8 @@ export function SettingsPage({
   onRefresh,
   refreshPending = false,
 }: SettingsPageProps) {
+  // Settings copy lives mostly in ConfigForm; keep hook ready for page chrome.
+  useTranslation();
   return (
     <ConfigForm
       config={config}

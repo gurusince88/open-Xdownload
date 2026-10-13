@@ -1,6 +1,8 @@
-import { Check, Menu, Moon, Palette, RefreshCw, Search, Sun } from "lucide-react";
+import { Check, Languages, Menu, Moon, Palette, RefreshCw, Search, Sun } from "lucide-react";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/cn";
+import { isAppLocale, type AppLocale } from "../../i18n";
 import { THEME_ACCENTS, useTheme } from "../../lib/useTheme";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
@@ -22,16 +24,22 @@ export function AppHeader({
   onToggleMobileMenu,
   showMenuButton = false,
 }: AppHeaderProps) {
+  const { t, i18n } = useTranslation();
   const [quickInput, setQuickInput] = useState("");
   const { resolved, toggle, accent, setAccent } = useTheme();
 
   const currentAccent = THEME_ACCENTS.find((a) => a.id === accent) || THEME_ACCENTS[0];
+  const locale: AppLocale = isAppLocale(i18n.language) ? i18n.language : "en";
 
   const handleSubmit = () => {
     const trimmed = quickInput.trim();
     if (!trimmed) return;
     onQuickSubmit(trimmed);
     setQuickInput("");
+  };
+
+  const setLocale = (next: AppLocale) => {
+    void i18n.changeLanguage(next);
   };
 
   return (
@@ -42,7 +50,7 @@ export function AppHeader({
             variant="text"
             icon={<Menu className="size-4" />}
             onClick={onToggleMobileMenu}
-            aria-label="打开导航菜单"
+            aria-label={t("nav.openMenu")}
           />
         )}
 
@@ -53,8 +61,8 @@ export function AppHeader({
               value={quickInput}
               onChange={(event) => setQuickInput(event.target.value)}
               onPressEnter={handleSubmit}
-              placeholder="粘贴 X 推文链接、@用户名或列表 ID，回车快速解析"
-              aria-label="快速解析输入"
+              placeholder={t("header.quickPlaceholder")}
+              aria-label={t("header.quickAria")}
               className="bg-surface/90 hover:bg-surface focus:bg-surface transition-all shadow-xs"
               prefix={<Search className="size-3.5 text-fg-subtle group-hover:text-brand-500 transition-colors" />}
               suffix={
@@ -71,7 +79,7 @@ export function AppHeader({
                     onClick={handleSubmit}
                     className="shadow-xs"
                   >
-                    解析
+                    {t("header.parse")}
                   </Button>
                 </div>
               }
@@ -85,13 +93,51 @@ export function AppHeader({
             v{__APP_VERSION__}
           </Tag>
 
+          <SimplePopover
+            align="end"
+            trigger={
+              <Button
+                variant="text"
+                aria-label={t("header.languageAria")}
+                icon={<Languages className="size-4 text-fg-muted" />}
+              />
+            }
+          >
+            <div className="w-40 space-y-1 p-0.5">
+              {(
+                [
+                  { id: "en" as const, label: t("header.languageEn") },
+                  { id: "zh" as const, label: t("header.languageZh") },
+                ] as const
+              ).map((opt) => {
+                const isActive = locale === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setLocale(opt.id)}
+                    className={cn(
+                      "flex w-full items-center justify-between rounded-control px-2.5 py-1.5 text-xs transition-colors cursor-pointer",
+                      isActive
+                        ? "bg-brand-500/10 text-brand-500 font-medium"
+                        : "text-fg-body hover:bg-surface-hover hover:text-fg",
+                    )}
+                  >
+                    <span>{opt.label}</span>
+                    {isActive && <Check className="size-3 text-brand-500" />}
+                  </button>
+                );
+              })}
+            </div>
+          </SimplePopover>
+
           {/* 主题强调色选择器 */}
           <SimplePopover
             align="end"
             trigger={
               <Button
                 variant="text"
-                aria-label="选择主题强调色"
+                aria-label={t("header.accentAria")}
                 icon={
                   <div className="flex items-center gap-1.5">
                     <span
@@ -107,7 +153,7 @@ export function AppHeader({
             }
           >
             <div className="w-52 space-y-2">
-              <div className="text-xs font-semibold text-fg px-1">主题强调色</div>
+              <div className="text-xs font-semibold text-fg px-1">{t("header.accentTitle")}</div>
               <div className="space-y-1">
                 {THEME_ACCENTS.map((opt) => {
                   const isActive = accent === opt.id;
@@ -130,7 +176,7 @@ export function AppHeader({
                             opt.dotColor,
                           )}
                         />
-                        <span>{opt.name}</span>
+                        <span>{t(`theme.${opt.id}`)}</span>
                       </div>
                       {isActive && <Check className="size-3 text-brand-500" />}
                     </button>
@@ -140,23 +186,23 @@ export function AppHeader({
             </div>
           </SimplePopover>
 
-          <Tooltip title={resolved === "dark" ? "切换到浅色模式" : "切换到深色模式"}>
+          <Tooltip title={resolved === "dark" ? t("header.themeToLight") : t("header.themeToDark")}>
             <Button
               variant="text"
               onClick={toggle}
-              aria-label="切换主题"
+              aria-label={t("header.themeAria")}
               icon={
                 resolved === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />
               }
             />
           </Tooltip>
 
-          <Tooltip title="刷新数据">
+          <Tooltip title={t("header.refresh")}>
             <Button
               icon={<RefreshCw className="size-4" />}
               loading={refreshPending}
               onClick={onRefresh}
-              aria-label="刷新数据"
+              aria-label={t("header.refresh")}
             />
           </Tooltip>
         </div>

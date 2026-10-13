@@ -12,10 +12,12 @@
   "dependencies": {
     "@tanstack/react-query": "^5.102.8",
     "clsx": "^2.1.1",
+    "i18next": "^26.4.4",
     "lucide-react": "^1.46.0",
     "radix-ui": "^1.6.7",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "react-i18next": "^17.0.16",
     "react-player": "^3.4.0",
     "tailwind-merge": "^3.7.0"
   },

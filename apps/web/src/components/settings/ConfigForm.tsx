@@ -11,6 +11,7 @@ import {
   Sun,
 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import React, { useEffect, useRef, useState } from "react";
 import {
   checkAuth,
@@ -39,6 +40,7 @@ export function ConfigForm({
   onRefresh?: () => void;
   refreshPending?: boolean;
 }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState(() => normalizeConfig(config));
   const [draftDirty, setDraftDirty] = useState(false);
@@ -90,9 +92,9 @@ export function ConfigForm({
       setDraftDirty(false);
       void queryClient.invalidateQueries({ queryKey: configQueryRoot });
       onRefresh?.();
-      toast.success({ message: "配置已保存" });
+      toast.success({ message: t("settings.saved") });
     },
-    onError: notifyError("保存失败"),
+    onError: notifyError(t("settings.save")),
   });
 
   async function runAuthCheck(submitted: AppConfig, notify: boolean) {

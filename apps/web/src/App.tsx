@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   archiveScheduleQueryRoot,
   configQueryRoot,
@@ -40,6 +41,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 const taskCenterSections = ["overview", "workbench", "tasks"];
 
 export default function App() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   // 与 Tailwind 的 lg 断点同源，避免 992–1024px 区间里布局与可见性错位。
   const isCompact = !useBreakpointUp("lg");
@@ -230,11 +232,11 @@ export default function App() {
               <Alert
                 type="error"
                 showIcon
-                message="任务数据加载失败"
+                message={t("app.jobsLoadFailed")}
                 description={
                   jobs.error instanceof Error
                     ? jobs.error.message
-                    : "请检查后台服务连接"
+                    : t("app.checkBackend")
                 }
               />
             )}
@@ -243,11 +245,11 @@ export default function App() {
               <Alert
                 type="error"
                 showIcon
-                message="配置数据加载失败"
+                message={t("app.configLoadFailed")}
                 description={
                   config.error instanceof Error
                     ? config.error.message
-                    : "请检查后台服务连接"
+                    : t("app.checkBackend")
                 }
               />
             )}
