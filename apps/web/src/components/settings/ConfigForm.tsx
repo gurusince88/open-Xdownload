@@ -295,9 +295,9 @@ function ThemeSettingsSection() {
                   >
                     {active && <Check className="size-3.5 stroke-[3]" />}
                   </span>
-                  <span className="text-xs font-semibold text-fg">{opt.name}</span>
+                  <span className="text-xs font-semibold text-fg">{t(`theme.${opt.id}`)}</span>
                   <span className="text-[10px] text-fg-subtle truncate max-w-full">
-                    {opt.description}
+                    {t(`theme.${opt.id}Desc`)}
                   </span>
                 </button>
               );
