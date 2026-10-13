@@ -17,6 +17,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/chenbin3625/open-Xdownload/internal/apperr"
 )
 
 // blockedTargetError 是拨号被链路本地地址防护拦截时返回的错误，便于调用方统一识别。
@@ -32,16 +34,16 @@ func ValidateProxyURL(raw string) error {
 	}
 	parsed, err := url.Parse(raw)
 	if err != nil {
-		return fmt.Errorf("代理地址无效: %w", err)
+		return apperr.E(apperr.InvalidProxyURL, err)
 	}
 	scheme := strings.ToLower(parsed.Scheme)
 	switch scheme {
 	case "http", "https", "socks5", "socks5h":
 	default:
-		return fmt.Errorf("代理协议不支持: %s", parsed.Scheme)
+		return apperr.E(apperr.UnsupportedProxyScheme, parsed.Scheme)
 	}
 	if parsed.Hostname() == "" {
-		return errors.New("代理地址缺少主机名")
+		return apperr.E(apperr.ProxyMissingHost)
 	}
 	return nil
 }
@@ -188,5 +190,5 @@ func (t errorRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
 	if t.err != nil {
 		return nil, t.err
 	}
-	return nil, errors.New("HTTP Transport 初始化失败")
+	return nil, apperr.E(apperr.HTTPTransportInitFailed)
 }

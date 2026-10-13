@@ -1,12 +1,13 @@
 package httpapi
 
 import (
-	"errors"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+
+	"github.com/chenbin3625/open-Xdownload/internal/apperr"
 )
 
 // guardCrossOrigin 阻止跨站请求伪造：本服务无内置鉴权，任何页面都能向
@@ -23,24 +24,24 @@ func guardCrossOrigin(next http.Handler) http.Handler {
 		origin := strings.TrimSpace(r.Header.Get("Origin"))
 		if isStateChanging(r.Method) {
 			if site := r.Header.Get("Sec-Fetch-Site"); site == "cross-site" || site == "same-site" {
-				writeError(w, http.StatusForbidden, errors.New("拒绝跨站请求"))
+				writeError(w, http.StatusForbidden, apperr.E(apperr.RejectCrossSite))
 				return
 			}
 			// 沙箱 iframe、data: 页面等不透明来源的 Origin 是 "null"。SPA 自身永远不会发出
 			// 这种请求；不带 Sec-Fetch-Site 的旧浏览器上，这是拦住无 body 简单 POST 的唯一一环。
 			if origin == "null" {
-				writeError(w, http.StatusForbidden, errors.New("拒绝不透明来源的请求"))
+				writeError(w, http.StatusForbidden, apperr.E(apperr.RejectOpaqueOrigin))
 				return
 			}
 		}
 		if origin != "" && origin != "null" {
 			if !originMatchesHost(origin, r.Host) {
-				writeError(w, http.StatusForbidden, errors.New("拒绝跨源请求"))
+				writeError(w, http.StatusForbidden, apperr.E(apperr.RejectCrossOrigin))
 				return
 			}
 		}
 		if !hostAllowed(r.Host) {
-			writeError(w, http.StatusMisdirectedRequest, errors.New("Host 不在允许列表内：通过域名访问时请把该域名加入 OPEN_XDOWNLOAD_ALLOWED_HOSTS"))
+			writeError(w, http.StatusMisdirectedRequest, apperr.E(apperr.HostNotAllowed))
 			return
 		}
 		next.ServeHTTP(w, r)

@@ -3,7 +3,6 @@ package parser
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -14,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/chenbin3625/open-Xdownload/internal/apperr"
 
 	"github.com/chenbin3625/open-Xdownload/internal/downloader"
 	"github.com/chenbin3625/open-Xdownload/internal/httpx"
@@ -93,7 +94,7 @@ func (s *Service) ParseTweetJSONWithOptions(rawURL string, payload []byte, optio
 		result = gjson.GetBytes(payload, "data.tweetResult.result")
 	}
 	if !result.Exists() {
-		return TweetData{}, errors.New("payload 中没有找到 tweet result")
+		return TweetData{}, apperr.E(apperr.NoTweetResult)
 	}
 	return tweetFromResult(rawURL, username, tweetID, result, options)
 }
@@ -109,15 +110,15 @@ func TweetFromGraphQLResultWithOptions(rawURL string, fallbackUsername string, f
 func ExtractTweetURL(rawURL string) (string, string, error) {
 	rawURL = strings.TrimSpace(rawURL)
 	if rawURL == "" {
-		return "", "", errors.New("链接不能为空")
+		return "", "", apperr.E(apperr.LinkEmpty)
 	}
 	parsed, err := url.Parse(rawURL)
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return "", "", fmt.Errorf("无效链接: %s", rawURL)
+		return "", "", apperr.E(apperr.InvalidLink, rawURL)
 	}
 	matches := tweetURLPattern.FindStringSubmatch(rawURL)
 	if len(matches) != 3 {
-		return "", "", errors.New("请输入 x.com 或 twitter.com 的推文链接")
+		return "", "", apperr.E(apperr.TweetLinkRequired)
 	}
 	return matches[1], matches[2], nil
 }
@@ -156,7 +157,7 @@ func tweetFromResult(rawURL string, fallbackUsername string, fallbackID string, 
 	}
 	legacy := result.Get("legacy")
 	if !legacy.Exists() {
-		return TweetData{}, errors.New("payload 中没有 legacy tweet")
+		return TweetData{}, apperr.E(apperr.NoLegacyTweet)
 	}
 	id := result.Get("rest_id").String()
 	if id == "" {
@@ -291,22 +292,22 @@ func (s *Service) parseSyndicationTweetWithClient(ctx context.Context, rawURL st
 	}
 	defer response.Body.Close()
 	if response.StatusCode >= 400 {
-		return TweetData{}, fmt.Errorf("X 推文详情请求失败: HTTP %d", response.StatusCode)
+		return TweetData{}, apperr.E(apperr.TweetDetailHTTPFailed, response.StatusCode)
 	}
 	payload, err := io.ReadAll(io.LimitReader(response.Body, 4<<20))
 	if err != nil {
 		return TweetData{}, err
 	}
 	if !json.Valid(payload) {
-		return TweetData{}, errors.New("X 推文详情返回了非 JSON 内容")
+		return TweetData{}, apperr.E(apperr.TweetDetailNotJSON)
 	}
 	result := gjson.ParseBytes(payload)
 	if !result.Get("id_str").Exists() && !result.Get("__typename").Exists() {
-		return TweetData{}, errors.New("X 推文详情响应中没有推文数据")
+		return TweetData{}, apperr.E(apperr.TweetDetailNoData)
 	}
 	// 已删除/受限推文返回 TweetTombstone：不能当成"一条没有媒体的推文"静默处理。
 	if result.Get("__typename").String() == "TweetTombstone" {
-		return TweetData{}, errors.New("推文不可用（已删除或受限）")
+		return TweetData{}, apperr.E(apperr.TweetUnavailable)
 	}
 	return tweetFromSyndication(rawURL, fallbackUsername, fallbackID, result, options)
 }

@@ -478,5 +478,20 @@
     "video": "Video",
     "animated_gif": "GIF",
     "file": "File"
+  },
+  "errors": {
+    "rateLimited": "X clients temporarily rate limited; retry later",
+    "noClient": "No available X client",
+    "allCookiesUnavailable": "All X cookies are unavailable",
+    "cookieDisabled": "X cookie marked unavailable",
+    "cookieRequired": "Configure auth_token and ct0 first",
+    "noMedia": "This tweet has no downloadable media",
+    "tweetUnavailable": "Tweet unavailable (deleted or restricted)",
+    "userUnavailable": "User unavailable",
+    "jobRetryBusy": "Job is still running or queued and cannot be retried",
+    "timelineReadFailed": "Failed to read timeline",
+    "archiveLinkFailed": "Failed to create archive link",
+    "loginVerifyOK": "X login verification succeeded",
+    "loginVerifyFailed": "X login verification failed"
   }
 }

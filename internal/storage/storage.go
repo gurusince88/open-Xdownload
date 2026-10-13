@@ -17,6 +17,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/chenbin3625/open-Xdownload/internal/apperr"
+
 	"github.com/chenbin3625/open-Xdownload/internal/config"
 	"github.com/chenbin3625/open-Xdownload/internal/downloader"
 	"github.com/jmoiron/sqlx"
@@ -65,7 +67,7 @@ const sqliteOpenOptions = "?_txlock=immediate&_pragma=busy_timeout(5000)&_pragma
 const schemaVersion = 2
 
 // ErrSchemaTooNew 表示库由更新版本写入，当前二进制不认识。
-var ErrSchemaTooNew = errors.New("数据库结构版本高于当前程序")
+var ErrSchemaTooNew = apperr.ErrSchemaTooNew
 
 const (
 	MinArchiveScheduleIntervalMinutes = 5
@@ -73,7 +75,7 @@ const (
 	MaxArchiveScheduleItems           = 200
 )
 
-var ErrArchiveScheduleAlreadyClaimed = errors.New("定时归档计划已被其他运行领取")
+var ErrArchiveScheduleAlreadyClaimed = apperr.ErrArchiveScheduleClaimed
 
 func Open(path string) (*Store, error) {
 	db, err := sqlx.Open("sqlite", path+sqliteOpenOptions)
@@ -134,11 +136,11 @@ func ensureWALMode(db *sqlx.DB) error {
 		} else if strings.EqualFold(mode, "wal") {
 			return nil
 		} else {
-			lastErr = fmt.Errorf("journal_mode 切换后仍为 %q", mode)
+			lastErr = apperr.E(apperr.JournalModeStuck, mode)
 		}
 		time.Sleep(25 * time.Millisecond)
 	}
-	return fmt.Errorf("无法把数据库切换到 WAL 模式: %w", lastErr)
+	return apperr.E(apperr.WALModeFailed, lastErr)
 }
 
 func (s *Store) migrate() error {
@@ -371,7 +373,7 @@ func (s *Store) checkSchemaVersion() error {
 		return err
 	}
 	if version > schemaVersion {
-		return fmt.Errorf("%w：库为 v%d，当前程序只支持到 v%d。请升级到对应版本的程序，或从升级前的备份恢复该库",
+		return apperr.E(apperr.SchemaDowngradeBlocked,
 			ErrSchemaTooNew, version, schemaVersion)
 	}
 	return nil
@@ -999,7 +1001,7 @@ func (s *Store) CancelJob(ctx context.Context, id int64) (Job, error) {
 UPDATE jobs SET status = ?, message = ?, progress = 1, error = '', updated_at = ?
 	WHERE id = ? AND status NOT IN (?, ?, ?, ?)
 	RETURNING *`,
-		JobCanceled, "已取消", time.Now().UTC(), id, JobCompleted, JobCompletedWithErrors, JobFailed, JobCanceled)
+		JobCanceled, apperr.MsgCanceled, time.Now().UTC(), id, JobCompleted, JobCompletedWithErrors, JobFailed, JobCanceled)
 	if err == nil {
 		return job, nil
 	}
@@ -1011,7 +1013,7 @@ UPDATE jobs SET status = ?, message = ?, progress = 1, error = '', updated_at = 
 }
 
 // ErrJobRetryBusy 表示原任务或同一目标的任务仍在运行或排队中。
-var ErrJobRetryBusy = errors.New("任务仍在运行或排队中，不能重试")
+var ErrJobRetryBusy = apperr.ErrJobRetryBusy
 
 // RetryJob 为已结束的任务创建一个同目标的新任务。检查与插入放在同一个写事务里：先读后
 // 写时，双击"重试"或两个标签页同时点会各自看到终态、各插入一条，同一目标被重复归档。
@@ -1045,7 +1047,7 @@ SELECT COUNT(*) FROM jobs WHERE kind = ? AND input = ? AND status IN (?, ?, ?)`,
 	if err := tx.GetContext(ctx, &retried, `
 INSERT INTO jobs (kind, status, input, title, progress, message, created_at, updated_at)
 VALUES (?, ?, ?, ?, 0, ?, ?, ?)
-RETURNING *`, job.Kind, JobPending, job.Input, job.Title, "排队中", now, now); err != nil {
+RETURNING *`, job.Kind, JobPending, job.Input, job.Title, apperr.MsgQueued, now, now); err != nil {
 		return Job{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -2390,16 +2392,16 @@ func prepareArchiveScheduleForSave(schedule ArchiveSchedule) (ArchiveSchedule, e
 		schedule.Name = "批量归档计划"
 	}
 	if schedule.IntervalMinutes < MinArchiveScheduleIntervalMinutes {
-		return ArchiveSchedule{}, fmt.Errorf("定时任务间隔不能小于 %d 分钟", MinArchiveScheduleIntervalMinutes)
+		return ArchiveSchedule{}, apperr.E(apperr.ScheduleIntervalTooShort, MinArchiveScheduleIntervalMinutes)
 	}
 	if schedule.IntervalMinutes > MaxArchiveScheduleIntervalMinutes {
-		return ArchiveSchedule{}, fmt.Errorf("定时任务间隔不能超过 %d 分钟", MaxArchiveScheduleIntervalMinutes)
+		return ArchiveSchedule{}, apperr.E(apperr.ScheduleIntervalTooLong, MaxArchiveScheduleIntervalMinutes)
 	}
 	if len(schedule.Items) == 0 {
-		return ArchiveSchedule{}, fmt.Errorf("定时任务目标不能为空")
+		return ArchiveSchedule{}, apperr.E(apperr.ScheduleTargetsEmpty)
 	}
 	if len(schedule.Items) > MaxArchiveScheduleItems {
-		return ArchiveSchedule{}, fmt.Errorf("定时任务一次最多包含 %d 个目标", MaxArchiveScheduleItems)
+		return ArchiveSchedule{}, apperr.E(apperr.ScheduleTooManyTargets, MaxArchiveScheduleItems)
 	}
 
 	items := make([]ArchiveScheduleItem, 0, len(schedule.Items))
@@ -2408,12 +2410,12 @@ func prepareArchiveScheduleForSave(schedule ArchiveSchedule) (ArchiveSchedule, e
 		item.Input = strings.TrimSpace(item.Input)
 		item.Title = strings.TrimSpace(item.Title)
 		if item.Input == "" {
-			return ArchiveSchedule{}, fmt.Errorf("定时任务目标不能为空")
+			return ArchiveSchedule{}, apperr.E(apperr.ScheduleTargetsEmpty)
 		}
 		switch item.Kind {
 		case JobKindUser, JobKindList, JobKindFollowing:
 		default:
-			return ArchiveSchedule{}, fmt.Errorf("定时任务不支持的目标类型: %s", item.Kind)
+			return ArchiveSchedule{}, apperr.E(apperr.ScheduleUnsupportedKind, item.Kind)
 		}
 		key := string(item.Kind) + "\x00" + strings.ToLower(item.Input)
 		if _, ok := seen[key]; ok {
@@ -2426,7 +2428,7 @@ func prepareArchiveScheduleForSave(schedule ArchiveSchedule) (ArchiveSchedule, e
 		items = append(items, item)
 	}
 	if len(items) == 0 {
-		return ArchiveSchedule{}, fmt.Errorf("定时任务目标不能为空")
+		return ArchiveSchedule{}, apperr.E(apperr.ScheduleTargetsEmpty)
 	}
 	itemsJSON, err := json.Marshal(items)
 	if err != nil {

@@ -1,12 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 import type { Job } from "./api";
 import i18n from "../i18n";
 import { getJobProgressDisplay, parseAggregatedErrors } from "./jobErrors";
 
-void i18n.changeLanguage("zh");
-
 describe("jobErrors", () => {
-  describe("parseAggregatedErrors", () => {
+  describe("parseAggregatedErrors (legacy Chinese)", () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage("zh");
+    });
+
     it("处理空输入", () => {
       expect(parseAggregatedErrors("")).toEqual([]);
       expect(parseAggregatedErrors(undefined)).toEqual([]);
@@ -46,11 +48,9 @@ describe("jobErrors", () => {
       expect(groups).toHaveLength(1);
       expect(groups[0].reason).toBe("X 客户端暂时全部限流，请稍后重试");
       expect(groups[0].action).toBe("读取媒体时间线失败");
-      // 8 个具体账号
       expect(groups[0].targets).toHaveLength(8);
       expect(groups[0].targets).toContain("@ld98625239830");
       expect(groups[0].targets).toContain("@EDSIONTOP1");
-      // 8 + 23 = 31 个错误
       expect(groups[0].count).toBe(31);
     });
 
@@ -92,7 +92,60 @@ describe("jobErrors", () => {
     });
   });
 
+  describe("parseAggregatedErrors (English)", () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage("en");
+    });
+
+    it("parses a single-account English timeline error", () => {
+      const groups = parseAggregatedErrors(
+        "Failed to read timeline for @alice: connection timed out",
+      );
+      expect(groups).toHaveLength(1);
+      expect(groups[0].reason).toBe("connection timed out");
+      expect(groups[0].action).toBe("Failed to read timeline");
+      expect(groups[0].targets).toEqual(["@alice"]);
+      expect(groups[0].count).toBe(1);
+    });
+
+    it("aggregates concatenated English rate-limit rows with trailer", () => {
+      const raw =
+        "Failed to read timeline for @u1: X clients temporarily rate limited; retry later " +
+        "Failed to read timeline for @u2: X clients temporarily rate limited; retry later " +
+        "Failed to read timeline for @u3: X clients temporarily rate limited; retry later " +
+        "and 5 more errors";
+
+      const groups = parseAggregatedErrors(raw);
+      expect(groups).toHaveLength(1);
+      expect(groups[0].reason).toBe("X clients temporarily rate limited; retry later");
+      expect(groups[0].action).toBe("Failed to read timeline");
+      expect(groups[0].targets).toEqual(["@u1", "@u2", "@u3"]);
+      expect(groups[0].count).toBe(8);
+    });
+
+    it("parses English backend pre-aggregated format", () => {
+      const backendAggregated =
+        "Failed to read timeline: X clients temporarily rate limited; retry later (31 accounts: @u1, @u2, @u3)";
+      const groups = parseAggregatedErrors(backendAggregated);
+      expect(groups).toHaveLength(1);
+      expect(groups[0].reason).toBe("X clients temporarily rate limited; retry later");
+      expect(groups[0].action).toBe("Failed to read timeline");
+      expect(groups[0].count).toBe(31);
+      expect(groups[0].targets).toEqual(["@u1", "@u2", "@u3"]);
+    });
+
+    it("maps known codes via errors.* catalog", () => {
+      const groups = parseAggregatedErrors("rate_limited: ignored detail");
+      expect(groups).toHaveLength(1);
+      expect(groups[0].reason).toBe("X clients temporarily rate limited; retry later");
+    });
+  });
+
   describe("getJobProgressDisplay", () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage("zh");
+    });
+
     it("正常进行中的任务返回其进度文案", () => {
       const job: Job = {
         id: 1,
@@ -164,6 +217,30 @@ describe("jobErrors", () => {
       expect(display.hasError).toBe(true);
       expect(display.tooltip).toContain("归档完成");
       expect(display.tooltip).toContain("X 客户端暂时全部限流，请稍后重试 [31项]");
+    });
+
+    it("aggregates English stored errors in EN UI", async () => {
+      await i18n.changeLanguage("en");
+      const job: Job = {
+        id: 5,
+        kind: "following",
+        status: "completed_with_errors",
+        input: "@owner",
+        title: "Following @owner",
+        progress: 100,
+        message: "Archive complete: users 2, tweets 10, downloaded 1, failed 3",
+        error:
+          "Failed to read timeline for @u1: X clients temporarily rate limited; retry later " +
+          "Failed to read timeline for @u2: X clients temporarily rate limited; retry later " +
+          "and 1 more errors",
+        createdAt: "",
+        updatedAt: "",
+      };
+      const display = getJobProgressDisplay(job);
+      expect(display.displayMsg).toBe(
+        "X clients temporarily rate limited; retry later (3 items)",
+      );
+      expect(display.hasError).toBe(true);
     });
   });
 });

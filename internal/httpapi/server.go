@@ -17,6 +17,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/chenbin3625/open-Xdownload/internal/apperr"
+
 	"github.com/chenbin3625/open-Xdownload/internal/config"
 	"github.com/chenbin3625/open-Xdownload/internal/httpx"
 	"github.com/chenbin3625/open-Xdownload/internal/jobs"
@@ -248,7 +250,7 @@ func (s *Server) checkAuth(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"configured": false,
 			"ok":         false,
-			"message":    "请先配置 auth_token 和 ct0",
+			"message":    apperr.Msg(apperr.CookieRequired),
 		})
 		return
 	}
@@ -275,7 +277,7 @@ func (s *Server) checkAuth(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"configured":  configured,
 			"ok":          false,
-			"message":     "所有 X Cookie 均不可用",
+			"message":     apperr.Msg(apperr.AllCookiesUnavailable),
 			"diagnostics": diagnostics,
 		})
 		return
@@ -284,7 +286,7 @@ func (s *Server) checkAuth(w http.ResponseWriter, r *http.Request) {
 		"configured":  configured,
 		"ok":          true,
 		"screenName":  screenName,
-		"message":     "X 登录校验通过",
+		"message":     apperr.Msg(apperr.LoginVerifyOK),
 		"diagnostics": diagnostics,
 	})
 }
@@ -340,11 +342,11 @@ func (s *Server) createJobsBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(req.Items) == 0 {
-		writeError(w, http.StatusBadRequest, fmt.Errorf("任务列表不能为空"))
+		writeError(w, http.StatusBadRequest, apperr.E(apperr.JobListEmpty))
 		return
 	}
 	if len(req.Items) > 200 {
-		writeError(w, http.StatusBadRequest, fmt.Errorf("一次最多创建 200 个任务"))
+		writeError(w, http.StatusBadRequest, apperr.E(apperr.JobBatchTooLarge))
 		return
 	}
 
@@ -364,7 +366,7 @@ func (s *Server) createJobsBatch(w http.ResponseWriter, r *http.Request) {
 		prepared = append(prepared, storage.JobDraft{Kind: kind, Input: input, Title: title})
 	}
 	if len(prepared) == 0 {
-		writeError(w, http.StatusBadRequest, fmt.Errorf("没有可创建的任务"))
+		writeError(w, http.StatusBadRequest, apperr.E(apperr.NoCreatableJobs))
 		return
 	}
 
@@ -532,7 +534,7 @@ func (s *Server) prepareJob(ctx context.Context, req jobRequest) (storage.JobKin
 		req.Kind = storage.JobKindTweetLink
 	}
 	if strings.TrimSpace(req.Input) == "" {
-		return "", "", "", fmt.Errorf("任务输入不能为空")
+		return "", "", "", apperr.E(apperr.JobInputEmpty)
 	}
 	req.Input = strings.TrimSpace(req.Input)
 	if req.Kind == storage.JobKindTweetLink {
@@ -545,30 +547,30 @@ func (s *Server) prepareJob(ctx context.Context, req jobRequest) (storage.JobKin
 		}
 	}
 	if req.Kind == storage.JobKindUser && strings.TrimSpace(req.Title) == "" {
-		req.Title = fmt.Sprintf("用户 %s", displayUserInput(req.Input))
+		req.Title = apperr.MsgJobTitleUser(displayUserInput(req.Input))
 	}
 	if req.Kind == storage.JobKindList && strings.TrimSpace(req.Title) == "" {
-		req.Title = fmt.Sprintf("列表 %s", req.Input)
+		req.Title = apperr.MsgJobTitleList(req.Input)
 	}
 	if req.Kind == storage.JobKindFollowing && strings.TrimSpace(req.Title) == "" {
-		req.Title = fmt.Sprintf("关注 %s", displayUserInput(req.Input))
+		req.Title = apperr.MsgJobTitleFollowing(displayUserInput(req.Input))
 	}
 	if req.Kind == storage.JobKindMediaURL {
 		parsed, err := url.Parse(req.Input)
 		if err != nil || parsed.Scheme == "" || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-			return "", "", "", fmt.Errorf("请输入有效的媒体 URL")
+			return "", "", "", apperr.E(apperr.InvalidMediaURL)
 		}
 		if !isAllowedDirectMediaURL(parsed) {
-			return "", "", "", fmt.Errorf("媒体 URL 仅支持 twimg.com 域名")
+			return "", "", "", apperr.E(apperr.MediaURLDomain)
 		}
 		if strings.TrimSpace(req.Title) == "" {
-			req.Title = "媒体 URL"
+			req.Title = apperr.MsgMediaURLTitle
 		}
 	}
 	switch req.Kind {
 	case storage.JobKindTweetLink, storage.JobKindMediaURL, storage.JobKindUser, storage.JobKindList, storage.JobKindFollowing:
 	default:
-		return "", "", "", fmt.Errorf("不支持的任务类型: %s", req.Kind)
+		return "", "", "", apperr.E(apperr.UnsupportedJobKind, req.Kind)
 	}
 	return req.Kind, req.Input, strings.TrimSpace(req.Title), nil
 }
@@ -678,12 +680,12 @@ func (s *Server) retryJob(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	if s.eventBus == nil {
-		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("事件总线不可用"))
+		writeError(w, http.StatusServiceUnavailable, apperr.E(apperr.EventBusUnavailable))
 		return
 	}
 	channel, ok := s.eventBus.Subscribe()
 	if !ok {
-		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("事件订阅连接数已达上限"))
+		writeError(w, http.StatusServiceUnavailable, apperr.E(apperr.EventSubLimit))
 		return
 	}
 	defer s.eventBus.Unsubscribe(channel)
@@ -772,7 +774,7 @@ func (s *Server) serveDownloadPreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err := os.Stat(videoPath); err != nil {
-		writeError(w, http.StatusNotFound, fmt.Errorf("文件不存在"))
+		writeError(w, http.StatusNotFound, apperr.E(apperr.FileNotFound))
 		return
 	}
 	posterPath := videoPath + ".preview.jpg"
@@ -786,7 +788,7 @@ func (s *Server) serveDownloadPreview(w http.ResponseWriter, r *http.Request) {
 	}
 	parsed, err := url.Parse(posterURL)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || !isAllowedPreviewHost(parsed.Hostname()) {
-		writeError(w, http.StatusNotFound, fmt.Errorf("没有可用的视频预览图"))
+		writeError(w, http.StatusNotFound, apperr.E(apperr.NoVideoPoster))
 		return
 	}
 	// 缩略图回源必须与媒体下载共用同一套代理解析：浏览器无法直连 twimg 的部署里，
@@ -800,9 +802,9 @@ func (s *Server) serveDownloadPreview(w http.ResponseWriter, r *http.Request) {
 		case errors.As(err, &statusErr):
 			writeError(w, statusErr.status, statusErr)
 		case r.Context().Err() != nil:
-			writeError(w, http.StatusServiceUnavailable, fmt.Errorf("预览图抓取已取消"))
+			writeError(w, http.StatusServiceUnavailable, apperr.E(apperr.PosterFetchCanceled))
 		default:
-			writeError(w, http.StatusBadGateway, fmt.Errorf("下载视频预览图失败"))
+			writeError(w, http.StatusBadGateway, apperr.E(apperr.PosterDownloadFailed))
 		}
 		return
 	}
@@ -826,10 +828,10 @@ func (e *posterStatusError) Error() string { return e.message }
 func fetchRemotePoster(ctx context.Context, client *http.Client, limiter countingSemaphore, posterURL string, posterPath string, maxBytes int64) error {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, posterURL, nil)
 	if err != nil {
-		return &posterStatusError{status: http.StatusNotFound, message: "预览图地址无效"}
+		return &posterStatusError{status: http.StatusNotFound, message: apperr.Msg(apperr.InvalidPosterURL)}
 	}
 	if err := limiter.acquire(ctx); err != nil {
-		return &posterStatusError{status: http.StatusServiceUnavailable, message: "预览图抓取繁忙"}
+		return &posterStatusError{status: http.StatusServiceUnavailable, message: apperr.Msg(apperr.PosterFetchBusy)}
 	}
 	defer limiter.release()
 	response, err := client.Do(request)
@@ -838,10 +840,10 @@ func fetchRemotePoster(ctx context.Context, client *http.Client, limiter countin
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return &posterStatusError{status: http.StatusNotFound, message: "视频预览图不可用"}
+		return &posterStatusError{status: http.StatusNotFound, message: apperr.Msg(apperr.VideoPosterUnavailable)}
 	}
 	if !strings.HasPrefix(response.Header.Get("Content-Type"), "image/") {
-		return &posterStatusError{status: http.StatusUnsupportedMediaType, message: "视频预览图格式无效"}
+		return &posterStatusError{status: http.StatusUnsupportedMediaType, message: apperr.Msg(apperr.InvalidVideoPosterFormat)}
 	}
 	temporary, err := os.CreateTemp(filepath.Dir(posterPath), ".preview-*.jpg")
 	if err != nil {
@@ -913,7 +915,7 @@ func resolveLocalLibraryPath(root, requested string) (string, error) {
 	}
 	filePath, err := filepath.Abs(requested)
 	if err != nil {
-		return "", fmt.Errorf("文件路径无效")
+		return "", apperr.E(apperr.InvalidFilePath)
 	}
 	rel, err := filepath.Rel(rootAbs, filePath)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
@@ -921,11 +923,11 @@ func resolveLocalLibraryPath(root, requested string) (string, error) {
 	}
 	resolvedRoot, err := filepath.EvalSymlinks(rootAbs)
 	if err != nil {
-		return "", fmt.Errorf("下载目录不存在: %w", os.ErrNotExist)
+		return "", apperr.E(apperr.DownloadDirMissing, os.ErrNotExist)
 	}
 	resolvedFile, err := filepath.EvalSymlinks(filePath)
 	if err != nil {
-		return "", fmt.Errorf("文件不存在: %w", os.ErrNotExist)
+		return "", fmt.Errorf("%w: %w", apperr.E(apperr.FileNotFound), os.ErrNotExist)
 	}
 	resolvedRel, err := filepath.Rel(resolvedRoot, resolvedFile)
 	if err != nil || resolvedRel == ".." || strings.HasPrefix(resolvedRel, ".."+string(filepath.Separator)) || filepath.IsAbs(resolvedRel) {
@@ -934,7 +936,7 @@ func resolveLocalLibraryPath(root, requested string) (string, error) {
 	return resolvedFile, nil
 }
 
-var errFileOutsideDownloadDir = errors.New("文件不在下载目录内")
+var errFileOutsideDownloadDir = apperr.ErrFileOutsideDownloadDir
 
 // writeResolveError maps resolveLocalLibraryPath failures to 404 (missing) or 403 (escape).
 func writeResolveError(w http.ResponseWriter, err error) {
@@ -952,7 +954,7 @@ func writeResolveError(w http.ResponseWriter, err error) {
 func (s *Server) serveLibraryFile(w http.ResponseWriter, r *http.Request) {
 	pathValue := strings.TrimSpace(r.URL.Query().Get("path"))
 	if pathValue == "" {
-		writeError(w, http.StatusBadRequest, fmt.Errorf("缺少文件路径"))
+		writeError(w, http.StatusBadRequest, apperr.E(apperr.MissingFilePath))
 		return
 	}
 	cfg, err := s.store.GetConfig(r.Context())
@@ -961,7 +963,7 @@ func (s *Server) serveLibraryFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !storage.IsLibraryMediaPath(pathValue) {
-		writeError(w, http.StatusForbidden, fmt.Errorf("仅支持媒体文件"))
+		writeError(w, http.StatusForbidden, apperr.E(apperr.MediaFilesOnly))
 		return
 	}
 	filePath, err := resolveLocalLibraryPath(cfg.DownloadDir, pathValue)
@@ -971,7 +973,7 @@ func (s *Server) serveLibraryFile(w http.ResponseWriter, r *http.Request) {
 	}
 	info, err := os.Stat(filePath)
 	if err != nil || info.IsDir() {
-		writeError(w, http.StatusNotFound, fmt.Errorf("文件不存在"))
+		writeError(w, http.StatusNotFound, apperr.E(apperr.FileNotFound))
 		return
 	}
 	http.ServeFile(w, r, filePath)
@@ -1006,7 +1008,7 @@ func (s *Server) serveDownloadFile(w http.ResponseWriter, r *http.Request) {
 	}
 	info, err := os.Stat(filePath)
 	if err != nil || info.IsDir() {
-		writeError(w, http.StatusNotFound, fmt.Errorf("文件不存在"))
+		writeError(w, http.StatusNotFound, apperr.E(apperr.FileNotFound))
 		return
 	}
 	http.ServeFile(w, r, filePath)
@@ -1152,7 +1154,7 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, target any) error {
 	// 情况下 POST JSON body（CSRF），命中各状态变更端点。即便本地部署也受此威胁。
 	media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || media != "application/json" {
-		return fmt.Errorf("Content-Type 必须是 application/json")
+		return apperr.E(apperr.JSONContentTypeRequired)
 	}
 	return json.NewDecoder(r.Body).Decode(target)
 }
@@ -1217,7 +1219,7 @@ func parsePositiveInt(r *http.Request, key string, fallback int, min int, max in
 func displayUserInput(input string) string {
 	input = strings.TrimSpace(input)
 	if input == "" {
-		return "用户"
+		return apperr.MsgUserLabel
 	}
 	if strings.HasPrefix(input, "@") {
 		return input
@@ -1296,7 +1298,7 @@ func resolvePathForCheck(path string) (string, error) {
 		}
 		parent := filepath.Dir(current)
 		if parent == current {
-			return "", fmt.Errorf("无法解析路径: %s", path)
+			return "", apperr.E(apperr.PathResolveFailed, path)
 		}
 		missing = append(missing, filepath.Base(current))
 		current = parent
@@ -1316,7 +1318,7 @@ func localDirectoryPath(value string, allowedRoots []string) (string, error) {
 		return "", err
 	}
 	if !withinAllowedRoot(path, allowedRoots) {
-		return "", fmt.Errorf("不允许访问此目录（仅限家目录与下载目录范围）")
+		return "", apperr.E(apperr.DirAccessDenied)
 	}
 	info, err := os.Stat(path)
 	if err != nil {
@@ -1324,7 +1326,7 @@ func localDirectoryPath(value string, allowedRoots []string) (string, error) {
 		return "", err
 	}
 	if !info.IsDir() {
-		return "", fmt.Errorf("%s 不是目录", path)
+		return "", apperr.E(apperr.NotADirectory, path)
 	}
 	return path, nil
 }
@@ -1334,20 +1336,19 @@ func localDirectoryPath(value string, allowedRoots []string) (string, error) {
 func validateDownloadDir(value string, allowedRoots []string) error {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
-		return fmt.Errorf("下载目录不能为空")
+		return apperr.E(apperr.DownloadDirEmpty)
 	}
 	path, err := filepath.Abs(trimmed)
 	if err != nil {
-		return fmt.Errorf("下载目录无效: %w", err)
+		return apperr.E(apperr.DownloadDirInvalid, err)
 	}
 	// 下载目录同时是媒体库的沙箱根：设成文件系统根或家目录本身，其下所有图片/视频都会
 	// 变成可读的"媒体库文件"。当前下载目录保持不变是允许的。
 	if isFilesystemRoot(path) || isHomeDirectory(path) {
-		return fmt.Errorf("下载目录不能是文件系统根目录或家目录本身，请选择其中的子目录")
+		return apperr.E(apperr.DownloadDirRootOrHome)
 	}
 	if !withinAllowedRoot(path, allowedRoots) {
-		return fmt.Errorf("下载目录不允许：仅限家目录或当前下载目录范围内；" +
-			"如需指向其他位置（例如外置磁盘），请用 OPEN_XDOWNLOAD_DOWNLOAD_DIR 环境变量启动")
+		return apperr.E(apperr.DownloadDirNotAllowed)
 	}
 	return nil
 }
@@ -1372,14 +1373,14 @@ func isHomeDirectory(path string) bool {
 
 func createLocalDirectoryPath(value string, allowedRoots []string) (string, error) {
 	if strings.TrimSpace(value) == "" {
-		return "", fmt.Errorf("目录路径不能为空")
+		return "", apperr.E(apperr.DirPathEmpty)
 	}
 	path, err := filepath.Abs(value)
 	if err != nil {
 		return "", err
 	}
 	if !withinAllowedRoot(path, allowedRoots) {
-		return "", fmt.Errorf("不允许创建此位置的目录（仅限家目录与下载目录范围）")
+		return "", apperr.E(apperr.DirCreateDenied)
 	}
 	if err := os.MkdirAll(path, 0o755); err != nil {
 		return "", err
@@ -1389,7 +1390,7 @@ func createLocalDirectoryPath(value string, allowedRoots []string) (string, erro
 		return "", err
 	}
 	if !info.IsDir() {
-		return "", fmt.Errorf("%s 不是目录", path)
+		return "", apperr.E(apperr.NotADirectory, path)
 	}
 	return path, nil
 }

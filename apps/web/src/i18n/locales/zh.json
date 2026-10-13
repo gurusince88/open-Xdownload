@@ -478,5 +478,20 @@
     "video": "视频",
     "animated_gif": "GIF",
     "file": "文件"
+  },
+  "errors": {
+    "rateLimited": "X 客户端暂时全部限流，请稍后重试",
+    "noClient": "没有可用 X 客户端",
+    "allCookiesUnavailable": "所有 X Cookie 均不可用",
+    "cookieDisabled": "X Cookie 已被标记为不可用",
+    "cookieRequired": "请先配置 auth_token 和 ct0",
+    "noMedia": "这条推文没有可下载媒体",
+    "tweetUnavailable": "推文不可用（已删除或受限）",
+    "userUnavailable": "用户不可用",
+    "jobRetryBusy": "任务仍在运行或排队中，不能重试",
+    "timelineReadFailed": "读取媒体时间线失败",
+    "archiveLinkFailed": "创建归档链接失败",
+    "loginVerifyOK": "X 登录校验通过",
+    "loginVerifyFailed": "X 登录校验失败"
   }
 }

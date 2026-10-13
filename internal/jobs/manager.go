@@ -19,6 +19,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/chenbin3625/open-Xdownload/internal/apperr"
+
 	"github.com/chenbin3625/open-Xdownload/internal/config"
 	"github.com/chenbin3625/open-Xdownload/internal/downloader"
 	"github.com/chenbin3625/open-Xdownload/internal/filestore"
@@ -194,7 +196,7 @@ func (m *Manager) CancelJob(ctx context.Context, id int64) (storage.Job, error) 
 }
 
 func (m *Manager) RetryFailedTweetsNow(ctx context.Context) (storage.Job, error) {
-	job, err := m.store.CreateJob(ctx, storage.JobKindFailedRetry, "failed-tweets", "失败推文重试")
+	job, err := m.store.CreateJob(ctx, storage.JobKindFailedRetry, "failed-tweets", apperr.MsgFailedTweetRetryTitle)
 	if err != nil {
 		return storage.Job{}, err
 	}
@@ -214,7 +216,7 @@ func (m *Manager) RunArchiveScheduleNow(ctx context.Context, id int64) ([]storag
 			return nil, err
 		}
 		if active {
-			return nil, fmt.Errorf("该计划上次创建的任务仍在运行")
+			return nil, apperr.E(apperr.ScheduleJobStillRunning)
 		}
 	}
 	jobs, err := m.store.CreateJobsForArchiveSchedule(ctx, schedule, time.Now().UTC())
@@ -397,7 +399,7 @@ func (m *Manager) process(ctx context.Context, saveCtx context.Context, job stor
 	default:
 		job.Status = storage.JobFailed
 		job.Progress = 1
-		job.Message = "当前任务类型还在迁移中"
+		job.Message = apperr.MsgJobKindMigrating
 		job.Error = fmt.Sprintf("unsupported job kind: %s", job.Kind)
 		m.save(saveCtx, job)
 	}
@@ -422,8 +424,8 @@ func (m *Manager) processTweetLink(ctx context.Context, saveCtx context.Context,
 		// 包括"只有缩略图、没有 mp4 变体的视频"：不能报下载完成，否则用户以为已存档。
 		job.Status = storage.JobFailed
 		job.Progress = 1
-		job.Message = "链接已识别，但还没有解析到媒体 URL"
-		job.Error = "这条推文没有可下载媒体"
+		job.Message = apperr.MsgLinkNoMediaURL
+		job.Error = apperr.Msg(apperr.NoMedia)
 		m.save(saveCtx, job)
 		return
 	}
@@ -440,7 +442,7 @@ func (m *Manager) processTweetLink(ctx context.Context, saveCtx context.Context,
 		}
 		job.Status = storage.JobDownloading
 		job.Progress = 0.2 + 0.7*float64(index)/float64(len(tweet.Media))
-		job.Message = fmt.Sprintf("正在下载 %d/%d", index+1, len(tweet.Media))
+		job.Message = apperr.MsgDownloadingProgress(index+1, len(tweet.Media))
 		job.Error = ""
 		if lastProgressSave.IsZero() || time.Since(lastProgressSave) >= progressWriteInterval {
 			lastProgressSave = time.Now()
@@ -465,9 +467,9 @@ func (m *Manager) processTweetLink(ctx context.Context, saveCtx context.Context,
 	}
 	job.Status = storage.JobCompleted
 	job.Progress = 1
-	job.Message = "下载完成"
+	job.Message = apperr.MsgDownloadComplete
 	if unavailable > 0 {
-		job.Message = fmt.Sprintf("下载完成：永久不可用 %d 个，已跳过", unavailable)
+		job.Message = apperr.MsgDownloadCompleteSkipped(unavailable)
 	}
 	job.Error = ""
 	m.save(saveCtx, job)
@@ -489,7 +491,7 @@ func singleURLFilenameHint(mediaURL string) string {
 func (m *Manager) processMediaURL(ctx context.Context, saveCtx context.Context, job storage.Job, mediaURL string, tweetID string) {
 	job.Status = storage.JobDownloading
 	job.Progress = 0.25
-	job.Message = "正在下载媒体"
+	job.Message = apperr.MsgDownloadingMedia
 	job.Error = ""
 	m.save(saveCtx, job)
 	result, err := m.download(ctx, saveCtx, job, mediaURL, tweetID, singleURLFilenameHint(mediaURL))
@@ -507,9 +509,9 @@ func (m *Manager) processMediaURL(ctx context.Context, saveCtx context.Context, 
 	}
 	job.Status = storage.JobCompleted
 	job.Progress = 1
-	job.Message = "下载完成"
+	job.Message = apperr.MsgDownloadComplete
 	if result.unavailable {
-		job.Message = "媒体永久不可用，已跳过"
+		job.Message = apperr.MsgMediaSkippedPermanent
 	}
 	job.Error = ""
 	m.save(saveCtx, job)
@@ -555,7 +557,7 @@ func (m *Manager) processFailedRetry(ctx context.Context, saveCtx context.Contex
 	}
 	job.Status = storage.JobDownloading
 	job.Progress = 0.2
-	job.Message = "正在重试失败推文"
+	job.Message = apperr.MsgRetryingFailedTweets
 	job.Error = ""
 	m.save(saveCtx, job)
 	retried := m.retryFailedTweets(ctx, saveCtx, job, cfg, true)
@@ -574,7 +576,7 @@ func (m *Manager) processFailedRetry(ctx context.Context, saveCtx context.Contex
 		job.Status = storage.JobCompleted
 	}
 	job.Progress = 1
-	job.Message = fmt.Sprintf("失败推文重试完成：成功 %d，剩余 %d", retried, remaining)
+	job.Message = apperr.MsgFailedTweetRetryDone(retried, remaining)
 	job.Error = ""
 	m.save(saveCtx, job)
 }
@@ -604,7 +606,7 @@ func (m *Manager) processList(ctx context.Context, saveCtx context.Context, job 
 		m.fail(saveCtx, job, "", err)
 		return
 	}
-	job.Message = "正在获取列表成员"
+	job.Message = apperr.MsgFetchingListMembers
 	job.Progress = 0.12
 	m.save(saveCtx, job)
 	members, err := client.GetListMembers(ctx, list)
@@ -653,7 +655,7 @@ func (m *Manager) processFollowing(ctx context.Context, saveCtx context.Context,
 		m.fail(saveCtx, job, "", err)
 		return
 	}
-	job.Message = "正在获取关注用户"
+	job.Message = apperr.MsgFetchingFollowing
 	job.Progress = 0.12
 	m.save(saveCtx, job)
 	members, err := client.GetFollowing(ctx, owner)
@@ -762,7 +764,7 @@ func (m *Manager) downloadMedia(ctx context.Context, saveCtx context.Context, jo
 				TweetID:  tweetID,
 				Error:    err.Error(),
 			}); markErr != nil {
-				return mediaDownloadResult{}, fmt.Errorf("记录永久不可用媒体失败: %v: %w", markErr, err)
+				return mediaDownloadResult{}, apperr.E(apperr.MarkUnavailableFailed, markErr, err)
 			}
 			_, _ = m.store.CreateFailedMedia(saveCtx, storage.FailedMedia{JobID: job.ID, MediaURL: mediaURL, Error: err.Error()})
 			return mediaDownloadResult{skipped: true, unavailable: true}, nil
@@ -1068,7 +1070,7 @@ func (m *Manager) archiveUsers(ctx context.Context, saveCtx context.Context, job
 		completed++
 		progressJob.Status = storage.JobResolving
 		progressJob.Progress = start + (end-start)*float64(completed)/float64(len(tasks))
-		progressJob.Message = fmt.Sprintf("已同步用户 %d/%d", completed, len(tasks))
+		progressJob.Message = apperr.MsgUsersSynced(completed, len(tasks))
 		progressJob.Error = ""
 		m.save(saveCtx, progressJob)
 	}
@@ -1079,7 +1081,7 @@ func (m *Manager) archiveUsers(ctx context.Context, saveCtx context.Context, job
 		}
 		saveProgress(
 			storage.JobResolving,
-			fmt.Sprintf("同步用户 %d/%d @%s", task.order+1, len(tasks), fallbackUserName(task.user)),
+			apperr.MsgSyncingUser(task.order+1, len(tasks), fallbackUserName(task.user)),
 		)
 		delta, err := m.archiveUser(ctx, saveCtx, job, cfg, pool, task.user, listEntity, func(message string) {
 			saveProgress(storage.JobDownloading, message)
@@ -1168,7 +1170,7 @@ func (m *Manager) archiveUser(ctx context.Context, saveCtx context.Context, job 
 	if listEntity != nil {
 		if err := m.ensureUserLink(saveCtx, cfg, *listEntity, user, dir); err != nil {
 			stats.Failed++
-			stats.Issues = append(stats.Issues, fmt.Sprintf("创建 @%s 的归档链接失败: %v", fallbackUserName(user), err))
+			stats.Issues = append(stats.Issues, apperr.ArchiveLink(fallbackUserName(user), err))
 		}
 	}
 	if waited {
@@ -1183,7 +1185,7 @@ func (m *Manager) archiveUser(ctx context.Context, saveCtx context.Context, job 
 	}
 	if pool == nil {
 		stats.Failed++
-		stats.Issues = append(stats.Issues, fmt.Sprintf("读取 @%s 的媒体时间线失败: 没有可用 X 客户端", fallbackUserName(user)))
+		stats.Issues = append(stats.Issues, apperr.TimelineRead(fallbackUserName(user), apperr.ErrNoClient))
 		return stats, nil
 	}
 
@@ -1202,7 +1204,7 @@ func (m *Manager) archiveUser(ctx context.Context, saveCtx context.Context, job 
 			return stats, err
 		}
 		stats.Failed++
-		stats.Issues = append(stats.Issues, fmt.Sprintf("读取 @%s 的媒体时间线失败: %v", fallbackUserName(user), err))
+		stats.Issues = append(stats.Issues, apperr.TimelineRead(fallbackUserName(user), err))
 		return stats, nil
 	}
 	if len(tweets) == 0 {
@@ -1240,7 +1242,7 @@ func (m *Manager) archiveTweets(ctx context.Context, saveCtx context.Context, jo
 				continue
 			}
 			if updateDownloading != nil {
-				updateDownloading(fmt.Sprintf("下载 @%s 的媒体", fallbackUserName(user)))
+				updateDownloading(apperr.MsgDownloadingUserMedia(fallbackUserName(user)))
 			}
 			result, err := m.downloadMedia(ctx, saveCtx, job, cfg, mediaURL, tweet.ID, dir, tweetFilename(cfg, tweet, mediaIndex), media.Type == parser.MediaPhoto, tweet.CreatedAt, media.PreviewURL)
 			if err != nil {
@@ -1558,7 +1560,7 @@ func (m *Manager) fail(ctx context.Context, job storage.Job, mediaURL string, er
 	}
 	job.Status = storage.JobFailed
 	job.Progress = 1
-	job.Message = "任务失败"
+	job.Message = apperr.MsgJobFailed
 	job.Error = err.Error()
 	m.save(ctx, job)
 }
@@ -1577,7 +1579,7 @@ func (m *Manager) save(ctx context.Context, job storage.Job) {
 func (m *Manager) cancel(ctx context.Context, job storage.Job) {
 	job.Status = storage.JobCanceled
 	job.Progress = 1
-	job.Message = "已取消"
+	job.Message = apperr.MsgCanceled
 	job.Error = ""
 	m.save(ctx, job)
 }
@@ -1714,21 +1716,7 @@ func fallbackUserName(user xclient.User) string {
 }
 
 func completionMessage(stats archiveStats, retried int) string {
-	parts := []string{
-		fmt.Sprintf("用户 %d", stats.Users),
-		fmt.Sprintf("推文 %d", stats.Tweets),
-		fmt.Sprintf("下载 %d", stats.Downloaded),
-	}
-	if stats.Skipped > 0 {
-		parts = append(parts, fmt.Sprintf("跳过 %d", stats.Skipped))
-	}
-	if stats.Failed > 0 {
-		parts = append(parts, fmt.Sprintf("失败 %d", stats.Failed))
-	}
-	if retried > 0 {
-		parts = append(parts, fmt.Sprintf("重试成功 %d", retried))
-	}
-	return "归档完成：" + strings.Join(parts, "，")
+	return apperr.MsgArchiveComplete(stats.Users, stats.Tweets, stats.Downloaded, stats.Skipped, stats.Failed, retried)
 }
 
 func isUsernameChar(b byte) bool {
@@ -1759,30 +1747,7 @@ func archiveIssueSummary(issues []string) string {
 			continue
 		}
 
-		var action string
-		var target string
-		reason := issue
-
-		idx := strings.Index(issue, ": ")
-		if idx != -1 {
-			prefix := strings.TrimSpace(issue[:idx])
-			reason = strings.TrimSpace(issue[idx+2:])
-
-			if atIdx := strings.Index(prefix, "@"); atIdx != -1 {
-				end := atIdx + 1
-				for end < len(prefix) && isUsernameChar(prefix[end]) {
-					end++
-				}
-				target = prefix[atIdx:end]
-				before := strings.TrimSpace(prefix[:atIdx])
-				after := strings.TrimSpace(prefix[end:])
-				after = strings.TrimPrefix(after, "的")
-				after = strings.TrimSpace(after)
-				action = strings.TrimSpace(before + after)
-			} else {
-				action = prefix
-			}
-		}
+		action, target, reason := parseArchiveIssue(issue)
 
 		key := action + "::: " + reason
 		if pos, ok := groupIndex[key]; ok {
@@ -1817,35 +1782,60 @@ func archiveIssueSummary(issues []string) string {
 		g := groups[i]
 		if g.count == 1 {
 			if len(g.targets) == 1 && g.action != "" {
-				lines = append(lines, fmt.Sprintf("%s (%s): %s", g.action, g.targets[0], g.reason))
+				lines = append(lines, apperr.AggregateSingle(g.action, g.targets[0], g.reason))
 			} else if g.action != "" {
 				lines = append(lines, fmt.Sprintf("%s: %s", g.action, g.reason))
 			} else {
 				lines = append(lines, g.reason)
 			}
+		} else if len(g.targets) > 0 {
+			targetList := strings.Join(g.targets, ", ")
+			lines = append(lines, apperr.AggregateAccounts(g.action, g.reason, g.count, targetList))
 		} else {
-			if len(g.targets) > 0 {
-				targetList := strings.Join(g.targets, "、")
-				if g.action != "" {
-					lines = append(lines, fmt.Sprintf("%s: %s (共 %d 个账号: %s)", g.action, g.reason, g.count, targetList))
-				} else {
-					lines = append(lines, fmt.Sprintf("%s (共 %d 个账号: %s)", g.reason, g.count, targetList))
-				}
-			} else {
-				if g.action != "" {
-					lines = append(lines, fmt.Sprintf("%s: %s (共 %d 次)", g.action, g.reason, g.count))
-				} else {
-					lines = append(lines, fmt.Sprintf("%s (共 %d 次)", g.reason, g.count))
-				}
-			}
+			lines = append(lines, apperr.AggregateTimes(g.action, g.reason, g.count))
 		}
 	}
 
 	if len(groups) > limit {
-		lines = append(lines, fmt.Sprintf("另有 %d 种其他异常", len(groups)-limit))
+		lines = append(lines, apperr.MoreErrorKinds(len(groups)-limit))
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+// parseArchiveIssue splits a per-user issue line into action, @target, and reason.
+// Supports English ("Failed to read timeline for @user: …") and legacy Chinese
+// ("读取 @user 的媒体时间线失败: …").
+func parseArchiveIssue(issue string) (action, target, reason string) {
+	reason = issue
+	idx := strings.Index(issue, ": ")
+	if idx == -1 {
+		return "", "", issue
+	}
+	prefix := strings.TrimSpace(issue[:idx])
+	reason = strings.TrimSpace(issue[idx+2:])
+
+	atIdx := strings.Index(prefix, "@")
+	if atIdx == -1 {
+		return prefix, "", reason
+	}
+	end := atIdx + 1
+	for end < len(prefix) && isUsernameChar(prefix[end]) {
+		end++
+	}
+	target = prefix[atIdx:end]
+	before := strings.TrimSpace(prefix[:atIdx])
+	before = strings.TrimSuffix(before, " for")
+	before = strings.TrimSpace(before)
+	after := strings.TrimSpace(prefix[end:])
+	after = strings.TrimPrefix(after, "的")
+	after = strings.TrimSpace(after)
+	if after == "" {
+		action = before
+	} else {
+		action = strings.TrimSpace(before + after)
+	}
+	return action, target, reason
 }
 
 var unsupportedPathChars = regexp.MustCompile(`[/\\:*?"<>\|]`)
@@ -1943,5 +1933,5 @@ func removeLinkPlaceholder(linkPath string) error {
 	if info.Mode()&os.ModeSymlink != 0 {
 		return os.Remove(linkPath)
 	}
-	return fmt.Errorf("链接路径 %s 已存在且不是符号链接或文件", linkPath)
+	return apperr.E(apperr.LinkPathExists, linkPath)
 }

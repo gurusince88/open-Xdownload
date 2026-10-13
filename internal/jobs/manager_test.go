@@ -599,7 +599,7 @@ func TestCompleteArchivePersistsUserIssueDetails(t *testing.T) {
 	manager.completeArchive(ctx, job, archiveStats{
 		Users:  1,
 		Failed: 1,
-		Issues: []string{"读取 @alice 的媒体时间线失败: timeout"},
+		Issues: []string{"Failed to read timeline for @alice: timeout"},
 	}, 0)
 
 	got, err := store.GetJob(ctx, job.ID)
@@ -627,34 +627,34 @@ func TestArchiveIssueSummaryAggregation(t *testing.T) {
 		},
 		{
 			name:   "single issue",
-			issues: []string{"读取 @alice 的媒体时间线失败: timeout"},
-			want:   []string{"读取 @alice 的媒体时间线失败: timeout"},
+			issues: []string{"Failed to read timeline for @alice: timeout"},
+			want:   []string{"Failed to read timeline for @alice: timeout"},
 		},
 		{
 			name: "multiple identical rate limits aggregated",
 			issues: []string{
-				"读取 @user1 的媒体时间线失败: X 客户端暂时全部限流，请稍后重试",
-				"读取 @user2 的媒体时间线失败: X 客户端暂时全部限流，请稍后重试",
-				"读取 @user3 的媒体时间线失败: X 客户端暂时全部限流，请稍后重试",
-				"读取 @user4 的媒体时间线失败: X 客户端暂时全部限流，请稍后重试",
-				"读取 @user5 的媒体时间线失败: X 客户端暂时全部限流，请稍后重试",
-				"读取 @user6 的媒体时间线失败: X 客户端暂时全部限流，请稍后重试",
-				"读取 @user7 的媒体时间线失败: X 客户端暂时全部限流，请稍后重试",
+				"Failed to read timeline for @user1: X clients temporarily rate limited; retry later",
+				"Failed to read timeline for @user2: X clients temporarily rate limited; retry later",
+				"Failed to read timeline for @user3: X clients temporarily rate limited; retry later",
+				"Failed to read timeline for @user4: X clients temporarily rate limited; retry later",
+				"Failed to read timeline for @user5: X clients temporarily rate limited; retry later",
+				"Failed to read timeline for @user6: X clients temporarily rate limited; retry later",
+				"Failed to read timeline for @user7: X clients temporarily rate limited; retry later",
 			},
 			want: []string{
-				"读取媒体时间线失败: X 客户端暂时全部限流，请稍后重试 (共 7 个账号: @user1、@user2、@user3、@user4、@user5、@user6、@user7)",
+				"Failed to read timeline: X clients temporarily rate limited; retry later (7 accounts: @user1, @user2, @user3, @user4, @user5, @user6, @user7)",
 			},
 		},
 		{
 			name: "distinct errors kept in separate lines",
 			issues: []string{
-				"读取 @user1 的媒体时间线失败: X 客户端暂时全部限流，请稍后重试",
-				"读取 @user2 的媒体时间线失败: X 客户端暂时全部限流，请稍后重试",
-				"读取 @user3 的媒体时间线失败: 404 Not Found",
+				"Failed to read timeline for @user1: X clients temporarily rate limited; retry later",
+				"Failed to read timeline for @user2: X clients temporarily rate limited; retry later",
+				"Failed to read timeline for @user3: 404 Not Found",
 			},
 			want: []string{
-				"读取媒体时间线失败: X 客户端暂时全部限流，请稍后重试 (共 2 个账号: @user1、@user2)",
-				"读取媒体时间线失败 (@user3): 404 Not Found",
+				"Failed to read timeline: X clients temporarily rate limited; retry later (2 accounts: @user1, @user2)",
+				"Failed to read timeline (@user3): 404 Not Found",
 			},
 		},
 	}
@@ -778,7 +778,7 @@ func TestShouldAbortArchiveUsersOnAllClientsRateLimited(t *testing.T) {
 	if !shouldAbortArchiveUsers(xclient.ErrAllClientsRateLimited) {
 		t.Fatal("all-clients rate limit should abort the current archive run")
 	}
-	if shouldAbortArchiveUsers(fmt.Errorf("读取失败")) {
+	if shouldAbortArchiveUsers(fmt.Errorf("read failed")) {
 		t.Fatal("ordinary user read errors should stay scoped to that user")
 	}
 }

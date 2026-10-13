@@ -472,7 +472,7 @@ func TestSyndicationTombstoneIsReportedAsUnavailable(t *testing.T) {
 	service.syndicationURL = server.URL
 	// 已删除推文不能被当成"一条没有媒体的推文"：用户需要看到推文不可用。
 	_, err := service.ParseTweetLink(context.Background(), "https://x.com/openai/status/1349129669258448897")
-	if err == nil || !strings.Contains(err.Error(), "不可用") {
+	if err == nil || !strings.Contains(err.Error(), "unavailable") {
 		t.Fatalf("err = %v, want an unavailable-tweet error", err)
 	}
 }

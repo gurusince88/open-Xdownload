@@ -51,7 +51,7 @@ func TestRetryActiveJobReturnsBusinessError(t *testing.T) {
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
 	}
-	if strings.Contains(response.Body.String(), "internal error") || !strings.Contains(response.Body.String(), "不能重试") {
+	if strings.Contains(response.Body.String(), "internal error") || !strings.Contains(response.Body.String(), "cannot be retried") {
 		t.Fatalf("body = %s, want business error", response.Body.String())
 	}
 }
@@ -257,7 +257,7 @@ func TestCreateLocalDirectoryRejectsPathOutsideAllowedRoots(t *testing.T) {
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, body = %s, want 400 for out-of-roots path", response.Code, response.Body.String())
 	}
-	if !strings.Contains(response.Body.String(), "不允许") {
+	if !strings.Contains(response.Body.String(), "home and download directory") {
 		t.Fatalf("body = %s, want allowlist error", response.Body.String())
 	}
 }

@@ -1,14 +1,14 @@
 package httpx
 
 import (
-	"errors"
-	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/chenbin3625/open-Xdownload/internal/apperr"
 )
 
 // ErrBodyTooLarge 表示响应体超过调用方给定的上限。
-var ErrBodyTooLarge = errors.New("响应体超过大小上限")
+var ErrBodyTooLarge = apperr.ErrBodyTooLarge
 
 // CopyLimited 最多从 src 复制 limit 字节到 dst；src 超过 limit 时返回 ErrBodyTooLarge。
 // 与 io.LimitReader 不同，超限不会被静默截断成"成功"：截断的图片若被当成完整文件发布，
@@ -30,13 +30,13 @@ func CopyLimited(dst io.Writer, src io.Reader, limit int64) (int64, error) {
 func RestrictRedirects(client *http.Client, allowedHost func(host string) bool) {
 	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 10 {
-			return errors.New("重定向次数过多")
+			return apperr.E(apperr.TooManyRedirects)
 		}
 		if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
-			return fmt.Errorf("拒绝非 HTTP 重定向: %s", req.URL.Scheme)
+			return apperr.E(apperr.RejectNonHTTPRedirect, req.URL.Scheme)
 		}
 		if !allowedHost(req.URL.Hostname()) {
-			return fmt.Errorf("拒绝重定向到 %s", req.URL.Hostname())
+			return apperr.E(apperr.RejectRedirectHost, req.URL.Hostname())
 		}
 		return nil
 	}

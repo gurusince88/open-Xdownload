@@ -580,7 +580,7 @@ func TestOpenRejectsRedirectOutsideTwimg(t *testing.T) {
 	defer server.Close()
 
 	_, err := New().Open(context.Background(), server.URL+"/media.mp4", Options{})
-	if err == nil || !strings.Contains(err.Error(), "非 twimg.com") {
+	if err == nil || !strings.Contains(err.Error(), "non-twimg.com") {
 		t.Fatalf("Open(redirect) error = %v, want non-twimg redirect rejection", err)
 	}
 }

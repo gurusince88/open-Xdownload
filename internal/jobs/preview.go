@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/chenbin3625/open-Xdownload/internal/apperr"
+
 	"github.com/chenbin3625/open-Xdownload/internal/config"
 	"github.com/chenbin3625/open-Xdownload/internal/filestore"
 	"github.com/chenbin3625/open-Xdownload/internal/httpx"
@@ -85,7 +87,7 @@ func isVideoLikePath(value string) bool {
 var savePosterImage = func(ctx context.Context, proxyURL string, rawURL string, destPath string) error {
 	parsed, err := url.Parse(rawURL)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || !isTwimgPreviewHost(parsed.Hostname()) {
-		return fmt.Errorf("预览图地址无效")
+		return apperr.E(apperr.InvalidPosterURL)
 	}
 	client := httpx.Client(proxyURL, posterFetchTimeout)
 	httpx.RestrictRedirects(client, isTwimgPreviewHost)
@@ -110,7 +112,7 @@ func fetchPosterImage(ctx context.Context, client *http.Client, rawURL string, d
 		return fmt.Errorf("HTTP %d", response.StatusCode)
 	}
 	if contentType := response.Header.Get("Content-Type"); !strings.HasPrefix(contentType, "image/") {
-		return fmt.Errorf("内容类型无效: %s", contentType)
+		return apperr.E(apperr.InvalidContentType, contentType)
 	}
 	temporary, err := os.CreateTemp(filepath.Dir(destPath), ".preview-*.jpg")
 	if err != nil {

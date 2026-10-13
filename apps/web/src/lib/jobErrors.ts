@@ -9,13 +9,88 @@ export interface AggregatedErrorGroup {
   count: number;
 }
 
+/** Exact English / legacy Chinese reasons → `errors.*` (full-string match only). */
+const REASON_I18N: Record<string, string> = {
+  "X clients temporarily rate limited; retry later": "errors.rateLimited",
+  "X 客户端暂时全部限流，请稍后重试": "errors.rateLimited",
+  "No available X client": "errors.noClient",
+  "没有可用 X 客户端": "errors.noClient",
+  "All X cookies are unavailable": "errors.allCookiesUnavailable",
+  "所有 X Cookie 均不可用": "errors.allCookiesUnavailable",
+  "所有 X Cookie 都不可用": "errors.allCookiesUnavailable",
+  "X cookie marked unavailable": "errors.cookieDisabled",
+  "X Cookie 已被标记为不可用": "errors.cookieDisabled",
+  "Configure auth_token and ct0 first": "errors.cookieRequired",
+  "请先配置 auth_token 和 ct0": "errors.cookieRequired",
+  "This tweet has no downloadable media": "errors.noMedia",
+  "这条推文没有可下载媒体": "errors.noMedia",
+  "Tweet unavailable (deleted or restricted)": "errors.tweetUnavailable",
+  "推文不可用（已删除或受限）": "errors.tweetUnavailable",
+  "User unavailable": "errors.userUnavailable",
+  "用户不可用": "errors.userUnavailable",
+  "Job is still running or queued and cannot be retried": "errors.jobRetryBusy",
+  "任务仍在运行或排队中，不能重试": "errors.jobRetryBusy",
+};
+
+const ACTION_I18N: Record<string, string> = {
+  "Failed to read timeline": "errors.timelineReadFailed",
+  "读取媒体时间线失败": "errors.timelineReadFailed",
+  "Failed to create archive link": "errors.archiveLinkFailed",
+  "创建归档链接失败": "errors.archiveLinkFailed",
+};
+
+const CODE_I18N: Record<string, string> = {
+  rate_limited: "errors.rateLimited",
+  cookie_required: "errors.cookieRequired",
+  cookie_disabled: "errors.cookieDisabled",
+  no_client: "errors.noClient",
+  all_cookies_unavailable: "errors.allCookiesUnavailable",
+  no_media: "errors.noMedia",
+  tweet_unavailable: "errors.tweetUnavailable",
+  user_unavailable: "errors.userUnavailable",
+  job_retry_busy: "errors.jobRetryBusy",
+  timeline_read_failed: "errors.timelineReadFailed",
+  archive_link_failed: "errors.archiveLinkFailed",
+};
+
+function translateKey(key: string): string | undefined {
+  const translated = i18n.t(key);
+  if (translated && translated !== key) return translated;
+  return undefined;
+}
+
+function localizeReason(reason: string): string {
+  const codeMatch = reason.match(/^([a-z][a-z0-9_]*)\s*:\s*(.+)$/i);
+  if (codeMatch && CODE_I18N[codeMatch[1].toLowerCase()]) {
+    const translated = translateKey(CODE_I18N[codeMatch[1].toLowerCase()]);
+    if (translated) return translated;
+  }
+  const key = REASON_I18N[reason];
+  if (key) {
+    const translated = translateKey(key);
+    if (translated) return translated;
+  }
+  return reason;
+}
+
+function localizeAction(action?: string): string | undefined {
+  if (!action) return undefined;
+  const key = ACTION_I18N[action];
+  if (key) {
+    const translated = translateKey(key);
+    if (translated) return translated;
+  }
+  return action;
+}
+
 /**
- * 将任务错误字符串解析并聚合为结构化分组。
- * 兼容处理：
- * 1. 历史数据库中无换行粘连的长文本：`读取 @u1 的媒体时间线失败: ... 读取 @u2 ... 另有 23 个错误`
- * 2. 换行分隔的多条报错
- * 3. 后端新输出的聚合格式：`读取媒体时间线失败: ... (共 31 个账号: @u1、@u2 等)`
- * 4. 单一简单错误信息（如 404、网络超时）
+ * Parse and aggregate job error strings into structured groups.
+ * Compatible with:
+ * 1. Historical CN concatenated rows: `读取 @u1 … 读取 @u2 … 另有 23 个错误`
+ * 2. Newline-separated multi-line errors
+ * 3. Backend pre-aggregated CN/EN: `(共 31 个账号: …)` / `(31 accounts: …)`
+ * 4. New English shapes: `Failed to read timeline for @user: …` / `and N more errors`
+ * 5. Simple single-line errors
  */
 export function parseAggregatedErrors(errorText?: string): AggregatedErrorGroup[] {
   if (!errorText || !errorText.trim()) {
@@ -24,7 +99,6 @@ export function parseAggregatedErrors(errorText?: string): AggregatedErrorGroup[
 
   const raw = errorText.trim();
 
-  // 1. 先根据换行符切分行
   let rawLines: string[];
   if (raw.includes("\n")) {
     rawLines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
@@ -32,9 +106,11 @@ export function parseAggregatedErrors(errorText?: string): AggregatedErrorGroup[
     rawLines = [raw];
   }
 
-  // 2. 检查单行中是否包含未换行的多条历史记录拼接（如 "读取 @xxx"、"创建 @xxx"、"另有 X 个错误"）
   const chunks: string[] = [];
-  const concatSplitRegex = /(?=(?:读取|创建)\s+@|另有\s*\d+\s*个错误)/g;
+  // CN: 读取 @ / 创建 @ / 另有 N 个错误
+  // EN: Failed to read timeline for @ / Failed to create archive link for @ / and N more errors
+  const concatSplitRegex =
+    /(?=(?:读取|创建)\s+@|另有\s*\d+\s*个错误|Failed to (?:read timeline|create archive link) for @|and\s+\d+\s+more errors)/gi;
 
   for (const line of rawLines) {
     const parts = line.split(concatSplitRegex).map((p) => p.trim()).filter(Boolean);
@@ -50,21 +126,22 @@ export function parseAggregatedErrors(errorText?: string): AggregatedErrorGroup[
   let trailerCount = 0;
 
   for (const chunk of chunks) {
-    // 检查尾部追加的 "另有 23 个错误"
-    const trailerMatch = chunk.match(/^另有\s*(\d+)\s*个错误$/);
+    const trailerMatch = chunk.match(/^(?:另有\s*(\d+)\s*个错误|and\s+(\d+)\s+more errors)$/i);
     if (trailerMatch) {
-      trailerCount += parseInt(trailerMatch[1], 10) || 0;
+      trailerCount += parseInt(trailerMatch[1] || trailerMatch[2], 10) || 0;
       continue;
     }
 
-    // 检查后端预聚合的格式：
-    // e.g. "读取媒体时间线失败: X 客户端暂时全部限流，请稍后重试 (共 31 个账号: @user1、@user2 等)"
+    // Backend pre-aggregated:
+    // CN: 读取媒体时间线失败: reason (共 31 个账号: @u1、@u2 等)
+    // EN: Failed to read timeline: reason (31 accounts: @u1, @u2)
     const backendGroupMatch = chunk.match(
-      /^(?:([^:：]+)[:：]\s*)?(.*?)\s*\((?:共\s*)?(\d+)\s*个(?:账号|目标|错误|次)?(?::|：)?\s*(.*?)\)$/,
+      /^(?:([^:：]+)[:：]\s*)?(.*?)\s*\((?:共\s*)?(\d+)\s*(?:个(?:账号|目标|错误|次)?|accounts?|times?)(?::|：)?\s*(.*?)\)$/i,
     );
     if (backendGroupMatch && backendGroupMatch[3]) {
-      const action = backendGroupMatch[1]?.trim();
-      const reason = backendGroupMatch[2]?.trim() || chunk;
+      const action = localizeAction(backendGroupMatch[1]?.trim()) || backendGroupMatch[1]?.trim();
+      const reasonRaw = backendGroupMatch[2]?.trim() || chunk;
+      const reason = localizeReason(reasonRaw);
       const count = parseInt(backendGroupMatch[3], 10) || 1;
       const targetStr = backendGroupMatch[4] || "";
       const targets = targetStr.match(/@[a-zA-Z0-9_]+/g) || [];
@@ -90,10 +167,9 @@ export function parseAggregatedErrors(errorText?: string): AggregatedErrorGroup[
       continue;
     }
 
-    // 单项错误行：
-    // e.g. "读取 @alice 的媒体时间线失败: timeout"
-    // e.g. "创建 @bob 的归档链接失败: permission denied"
-    // e.g. "用户不存在或已被封禁 (404 Not Found)"
+    // Single-line:
+    // CN: 读取 @alice 的媒体时间线失败: timeout
+    // EN: Failed to read timeline for @alice: timeout
     let action: string | undefined;
     let target: string | undefined;
     let reason = chunk;
@@ -103,18 +179,39 @@ export function parseAggregatedErrors(errorText?: string): AggregatedErrorGroup[
       const prefix = chunk.slice(0, colonIdx).trim();
       reason = chunk.slice(colonIdx + (chunk[colonIdx] === "：" ? 1 : 2)).trim();
 
-      const targetMatch = prefix.match(/@([a-zA-Z0-9_]+)/);
-      if (targetMatch) {
-        target = `@${targetMatch[1]}`;
-        const cleanPrefix = prefix
-          .replace(/@[a-zA-Z0-9_]+/g, "")
-          .replace(/\s*的\s*/g, "")
-          .replace(/\s+/g, "")
-          .trim();
-        action = cleanPrefix || undefined;
-      } else if (prefix.length < 30) {
-        action = prefix;
+      const enPrefix = prefix.match(
+        /^(Failed to read timeline|Failed to create archive link)\s+for\s+@([a-zA-Z0-9_]+)$/i,
+      );
+      if (enPrefix) {
+        action = enPrefix[1];
+        target = `@${enPrefix[2]}`;
+      } else {
+        const targetMatch = prefix.match(/@([a-zA-Z0-9_]+)/);
+        if (targetMatch) {
+          target = `@${targetMatch[1]}`;
+          const cleanPrefix = prefix
+            .replace(/@[a-zA-Z0-9_]+/g, "")
+            .replace(/\s*的\s*/g, "")
+            .replace(/\s+for\s*$/i, "")
+            .replace(/\s+/g, "")
+            .trim();
+          action = cleanPrefix || undefined;
+        } else if (prefix.length < 40) {
+          action = prefix;
+        }
       }
+    }
+
+    // Prefer stable apperr codes when the prefix is a known code token.
+    if (action && CODE_I18N[action.toLowerCase()]) {
+      const translated = translateKey(CODE_I18N[action.toLowerCase()]);
+      if (translated) {
+        reason = translated;
+        action = undefined;
+      }
+    } else {
+      action = localizeAction(action) || action;
+      reason = localizeReason(reason);
     }
 
     const key = `${action || ""}:::${reason}`;
@@ -137,10 +234,8 @@ export function parseAggregatedErrors(errorText?: string): AggregatedErrorGroup[
     }
   }
 
-  // 累加 trailer 计数（如 "另有 23 个错误"）
   if (trailerCount > 0) {
     if (groups.length > 0) {
-      // 归入第一个（通常也是唯一的主原因）组
       groups[0].count += trailerCount;
     } else {
       groups.push({
@@ -156,7 +251,7 @@ export function parseAggregatedErrors(errorText?: string): AggregatedErrorGroup[
 }
 
 /**
- * 为任务列表"执行进度"列计算精简且语义明确的展示文案及悬停提示
+ * Compact progress-column label and hover tooltip for a job.
  */
 export function getJobProgressDisplay(job: Job): {
   displayMsg: string;
@@ -188,16 +283,14 @@ export function getJobProgressDisplay(job: Job): {
 
   const groups = parseAggregatedErrors(job.error);
 
-  // 无可解析的错误组
   if (groups.length === 0) {
     const msg =
       job.error ||
       job.message ||
       (isFailed ? i18n.t("tasks.statusFailed") : i18n.t("tasks.statusRunning"));
-    return { displayMsg: msg, tooltip: msg, hasError };
+    return { displayMsg: localizeReason(msg), tooltip: localizeReason(msg), hasError };
   }
 
-  // 单一错误且仅针对单个目标/单次
   if (groups.length === 1 && groups[0].count <= 1 && groups[0].targets.length <= 1) {
     const msg =
       groups[0].reason ||
@@ -210,7 +303,6 @@ export function getJobProgressDisplay(job: Job): {
     return { displayMsg: msg, tooltip, hasError };
   }
 
-  // 多个目标或批量聚合错误
   const totalCount = groups.reduce((acc, g) => acc + g.count, 0);
   let displayMsg: string;
   if (groups.length === 1) {

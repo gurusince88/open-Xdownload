@@ -18,6 +18,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/chenbin3625/open-Xdownload/internal/apperr"
+
 	"github.com/chenbin3625/open-Xdownload/internal/httpx"
 )
 
@@ -308,10 +310,10 @@ func (d *Downloader) Open(ctx context.Context, rawURL string, options Options) (
 				return nil
 			}
 			if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
-				return fmt.Errorf("拒绝非 HTTP 媒体重定向: %s", req.URL.String())
+				return apperr.E(apperr.RejectNonHTTPMediaRedirect, req.URL.String())
 			}
 			if !isAllowedTwimgHost(req.URL.Hostname()) {
-				return fmt.Errorf("拒绝媒体重定向到非 twimg.com 域名: %s", req.URL.Hostname())
+				return apperr.E(apperr.RejectMediaRedirectHost, req.URL.Hostname())
 			}
 			return nil
 		},

@@ -17,6 +17,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/chenbin3625/open-Xdownload/internal/apperr"
+
 	"github.com/chenbin3625/open-Xdownload/internal/config"
 	"github.com/chenbin3625/open-Xdownload/internal/httpx"
 	"github.com/chenbin3625/open-Xdownload/internal/parser"
@@ -52,11 +54,11 @@ const (
 	requestMaxAttempts = 5
 )
 
-var ErrAllClientsRateLimited = errors.New("X 客户端暂时全部限流，请稍后重试")
+var ErrAllClientsRateLimited = apperr.ErrRateLimited
 
 // ErrClientDisabled 表示该 Cookie 近期因认证失败被标记为不可用。它不是瞬时错误：
 // 同一客户端重试只会立刻再次命中，应交给 Pool 换用其他 Cookie。
-var ErrClientDisabled = errors.New("X Cookie 已被标记为不可用")
+var ErrClientDisabled = apperr.ErrClientDisabled
 
 // clientDisableCooldown 是认证失败后客户端被禁用的时长，到期后允许重新尝试。
 var clientDisableCooldown = 30 * time.Minute
@@ -155,9 +157,9 @@ type HTTPError struct {
 
 func (e *HTTPError) Error() string {
 	if e.Payload == "" {
-		return fmt.Sprintf("X API 请求失败: HTTP %d", e.StatusCode)
+		return apperr.MsgAPIRequestFailed(e.StatusCode, "")
 	}
-	return fmt.Sprintf("X API 请求失败: HTTP %d %s", e.StatusCode, e.Payload)
+	return apperr.MsgAPIRequestFailed(e.StatusCode, e.Payload)
 }
 
 type ClientStatus struct {
@@ -179,7 +181,7 @@ type PoolDiagnostics struct {
 
 func NewPool(cfg config.AppConfig) (*Pool, error) {
 	if strings.TrimSpace(cfg.AuthToken) == "" || strings.TrimSpace(cfg.CSRFToken) == "" {
-		return nil, errors.New("需要先配置 auth_token 和 ct0 才能调用 X GraphQL")
+		return nil, apperr.E(apperr.AuthRequired)
 	}
 	creds := []Credentials{{AuthToken: cfg.AuthToken, CSRFToken: cfg.CSRFToken}}
 	creds = append(creds, ParseAdditionalCookies(cfg.AdditionalCookies)...)
@@ -201,7 +203,7 @@ func NewPool(cfg config.AppConfig) (*Pool, error) {
 		clients = append(clients, client)
 	}
 	if len(clients) == 0 {
-		return nil, errors.New("没有可用 Cookie")
+		return nil, apperr.E(apperr.NoCookie)
 	}
 	return &Pool{clients: clients}, nil
 }
@@ -232,10 +234,10 @@ func NewClient(cred Credentials, proxyURL string) (*Client, error) {
 			// 拒绝跨域跳转也避免被重定向到内网地址。
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				if len(via) >= 10 {
-					return fmt.Errorf("重定向次数过多")
+					return apperr.E(apperr.TooManyRedirects)
 				}
 				if len(via) > 0 && !sameHost(req.URL.Host, via[0].URL.Host) {
-					return fmt.Errorf("拒绝跨域重定向: %s", req.URL.Host)
+					return apperr.E(apperr.CrossDomainRedirect, req.URL.Host)
 				}
 				return nil
 			},
@@ -275,7 +277,7 @@ var maxPoolSelectWaitStep = 60 * time.Second
 
 func (p *Pool) Select(ctx context.Context, path string) (*Client, error) {
 	if p == nil || len(p.clients) == 0 {
-		return nil, errors.New("没有可用 X 客户端")
+		return nil, apperr.ErrNoClient
 	}
 	var waited time.Duration
 	for {
@@ -300,10 +302,10 @@ func (p *Pool) Select(ctx context.Context, path string) (*Client, error) {
 		}
 		p.mu.Unlock()
 		if disabled == len(p.clients) {
-			return nil, errors.New("所有 X Cookie 都不可用")
+			return nil, apperr.E(apperr.AllCookiesUnavailable)
 		}
 		if blocked == 0 {
-			return nil, errors.New("没有可用 X 客户端")
+			return nil, apperr.ErrNoClient
 		}
 		// 全部候选被限流：等最早复位时刻（有界），避免按固定 3s 空转碰运气。
 		wait := p.earliestBlockedWait()
@@ -412,7 +414,7 @@ func (c *Client) GetSelfScreenName(ctx context.Context) (string, error) {
 	}
 	defer response.Body.Close()
 	if response.StatusCode >= 400 {
-		err := fmt.Errorf("X 登录校验失败: HTTP %d", response.StatusCode)
+		err := apperr.E(apperr.LoginVerifyFailed, response.StatusCode)
 		// 仅认证类失败（401/403）才禁用客户端；429/5xx 视为瞬时，禁用会误判有效 cookie 不可用。
 		if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
 			c.disable(err)
@@ -427,7 +429,7 @@ func (c *Client) GetSelfScreenName(ctx context.Context) (string, error) {
 	if len(matches) < 2 {
 		// HTTP 200 却识别不到账号，多是首页改版或返回了挑战页，不能证明 Cookie 失效：
 		// 只记录错误供诊断，不禁用。
-		err := errors.New("无法从 X 首页识别登录账号")
+		err := apperr.E(apperr.LoginAccountUnrecognized)
 		c.recordError(err)
 		return "", err
 	}
@@ -450,7 +452,7 @@ func (p *Pool) GetUserByInput(ctx context.Context, input string) (User, error) {
 func getUserByInput(ctx context.Context, requester timelineRequester, input string) (User, error) {
 	input = strings.TrimSpace(strings.TrimPrefix(input, "@"))
 	if input == "" {
-		return User{}, errors.New("用户不能为空")
+		return User{}, apperr.E(apperr.UserEmpty)
 	}
 	if _, err := strconv.ParseUint(input, 10, 64); err == nil {
 		return getUserByID(ctx, requester, input)
@@ -499,7 +501,7 @@ func (c *Client) GetListByID(ctx context.Context, id string) (List, error) {
 	}
 	raw := gjson.GetBytes(payload, "data.list")
 	if !raw.Exists() {
-		return List{}, errors.New("列表不存在")
+		return List{}, apperr.E(apperr.ListNotFound)
 	}
 	creator, _ := parseUser(raw.Get("user_results"))
 	return List{
@@ -518,7 +520,7 @@ func (p *Pool) GetUserMediaWithOptions(ctx context.Context, user User, options p
 	if userMediaNeedsPrimaryClient(user) {
 		client := p.Primary()
 		if client == nil {
-			return nil, errors.New("没有可用 X 客户端")
+			return nil, apperr.ErrNoClient
 		}
 		return getUserTimeline(ctx, client, user, options)
 	}
@@ -803,7 +805,7 @@ func (p *Pool) graphQL(ctx context.Context, path string, values url.Values) ([]b
 	if lastErr != nil {
 		return nil, lastErr
 	}
-	return nil, errors.New("没有可用 X 客户端")
+	return nil, apperr.ErrNoClient
 }
 
 func (c *Client) do(ctx context.Context, method string, path string, query url.Values, form url.Values) ([]byte, error) {
@@ -1053,11 +1055,11 @@ func parseUser(raw gjson.Result) (User, error) {
 		raw = raw.Get("result")
 	}
 	if raw.Get("__typename").String() == "UserUnavailable" {
-		return User{}, errors.New("用户不可用")
+		return User{}, apperr.E(apperr.UserUnavailable)
 	}
 	legacy := raw.Get("legacy")
 	if !legacy.Exists() {
-		return User{}, errors.New("响应中没有用户 legacy 数据")
+		return User{}, apperr.E(apperr.NoUserLegacy)
 	}
 	// X 已把部分字段从 legacy 迁到 core / privacy / relationship_perspectives，不同接口
 	// 返回的结构并不一致：新位置优先，旧位置兜底。
@@ -1091,9 +1093,9 @@ func timelineItems(payload []byte, instructionsPath string) ([]gjson.Result, str
 	if !instructions.Exists() {
 		typeName := gjson.GetBytes(payload, "data.user.result.__typename").String()
 		if typeName != "" && typeName != "User" {
-			return nil, "", fmt.Errorf("用户不可用: %s", typeName)
+			return nil, "", errors.New(apperr.MsgUserUnavailableTyped(typeName))
 		}
-		return nil, "", fmt.Errorf("无法解析 timeline instructions")
+		return nil, "", apperr.E(apperr.TimelineParseFailed)
 	}
 	entries := gjson.Result{}
 	moduleItems := gjson.Result{}
